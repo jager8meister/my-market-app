@@ -8,6 +8,7 @@ class MyMarketAppApplicationTests {
 
 	@Test
 	void contextLoads() {
+		// Проверяет, что Spring контекст успешно загружается
 	}
 
 }
