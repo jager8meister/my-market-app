@@ -14,6 +14,5 @@ public interface CartMapper {
 	@Mapping(target = "description", source = "item.description")
 	@Mapping(target = "price", source = "item.price")
 	@Mapping(target = "imgPath", source = "item.imgPath")
-	@Mapping(target = "count", source = "count")
 	CartItemResponseDto toCartItemResponse(CartEntry entry);
 }

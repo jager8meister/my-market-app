@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -17,7 +16,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.core.io.ClassPathResource;
 
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
 import ru.yandex.practicum.mymarket.entity.ItemImageEntity;
@@ -50,16 +48,19 @@ class ItemImageInitializerTest {
 		item1.setId(1L);
 		item1.setTitle("Item 1");
 		item1.setPrice(1000L);
+		item1.setImgPath("images/android_phone.png");
 
 		item2 = new ItemEntity();
 		item2.setId(2L);
 		item2.setTitle("Item 2");
 		item2.setPrice(2000L);
+		item2.setImgPath("images/iphone.png");
 
 		item3 = new ItemEntity();
 		item3.setId(3L);
 		item3.setTitle("Item 3");
 		item3.setPrice(3000L);
+		item3.setImgPath("images/laptop_light.png");
 	}
 
 	@Test
@@ -131,17 +132,20 @@ class ItemImageInitializerTest {
 	}
 
 	@Test
-	void shouldCycleImageResourcesForMultipleItems() {
+	void shouldSaveImagesForMultipleItems() {
 		// given
 		ItemEntity item4 = new ItemEntity();
 		item4.setId(4L);
 		item4.setTitle("Item 4");
 		item4.setPrice(4000L);
+		item4.setImgPath("images/laptop_white.png");
+		item4.setImgPath("images/laptop_dark.png");
 
 		ItemEntity item5 = new ItemEntity();
 		item5.setId(5L);
 		item5.setTitle("Item 5");
 		item5.setPrice(5000L);
+		item5.setImgPath("images/headphones.png");
 
 		List<ItemEntity> items = Arrays.asList(item1, item2, item3, item4, item5);
 		when(itemRepository.findAll()).thenReturn(items);
@@ -151,7 +155,7 @@ class ItemImageInitializerTest {
 		itemImageInitializer.fillImagesIfMissing();
 
 		// then
-		// Should save image for all 5 items (cycling through 3 image resources)
+		// Should save image for all 5 items
 		verify(itemImageRepository, times(5)).save(any(ItemImageEntity.class));
 	}
 

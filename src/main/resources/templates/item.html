@@ -7,6 +7,15 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
           integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <style>
+        .product-img {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            background-color: #f8f9fa;
+            border-radius: 0.5rem;
+        }
+    </style>
 </head>
 
 <body class="bg-light">
@@ -26,11 +35,9 @@
     <div class="row p-2">
         <div class="col">
             <div class="card">
-                <img class="p-2"
+                <img class="p-2 product-img"
                      th:src="@{'/items/' + ${item.id} + '/image'}"
-                     alt="Изображение товара"
-                     width="300"
-                     height="300">
+                     alt="Изображение товара">
                 <div class="card-body">
                     <h5 class="card-title" th:text="${item.title}"></h5>
                     <h5>

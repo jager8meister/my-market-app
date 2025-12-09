@@ -11,6 +11,7 @@ import ru.yandex.practicum.mymarket.entity.ItemEntity;
 public class CartEntry {
 
 	private ItemEntity item;
+
 	private int count;
 }
 

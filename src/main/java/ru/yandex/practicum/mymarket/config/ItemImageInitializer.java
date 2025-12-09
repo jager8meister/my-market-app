@@ -3,6 +3,7 @@ package ru.yandex.practicum.mymarket.config;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
@@ -37,27 +38,29 @@ public class ItemImageInitializer {
 			return;
 		}
 
-		ClassPathResource[] resources = new ClassPathResource[]{
-				new ClassPathResource("static/images/phone.svg"),
-				new ClassPathResource("static/images/laptop.svg"),
-				new ClassPathResource("static/images/headphones.svg")
-		};
-
-		for (int index = 0; index < items.size(); index++) {
-			ItemEntity item = items.get(index);
+		for (ItemEntity item : items) {
 
 			if (itemImageRepository.findByItemId(item.getId()).isPresent()) {
 				continue;
 			}
 
-			ClassPathResource resource = resources[index % resources.length];
+			if (item.getImgPath() == null || item.getImgPath().isBlank()) {
+				throw new ImageInitializationException("Failed to load image for item " + item.getId() + ": image path is empty");
+			}
+
+			String resourcePath = "static/" + item.getImgPath();
+			ClassPathResource resource = new ClassPathResource(resourcePath);
+
+			if (!resource.exists()) {
+				throw new ImageInitializationException("Failed to load image for item " + item.getId() + ": resource " + resourcePath + " not found");
+			}
 
 			try (InputStream inputStream = resource.getInputStream()) {
 				byte[] data = inputStream.readAllBytes();
 				ItemImageEntity image = new ItemImageEntity();
 				image.setItem(item);
 				image.setData(data);
-				image.setContentType("image/svg+xml");
+				image.setContentType(resolveContentType(item.getImgPath()));
 				itemImageRepository.save(image);
 				log.debug("Loaded image for item id: {}", item.getId());
 			} catch (IOException e) {
@@ -66,5 +69,19 @@ public class ItemImageInitializer {
 			}
 		}
 		log.info("Item image initialization completed successfully");
+	}
+
+	private String resolveContentType(String imgPath) {
+		String lowerCasePath = imgPath.toLowerCase(Locale.ROOT);
+		if (lowerCasePath.endsWith(".png")) {
+			return "image/png";
+		}
+		if (lowerCasePath.endsWith(".jpg") || lowerCasePath.endsWith(".jpeg")) {
+			return "image/jpeg";
+		}
+		if (lowerCasePath.endsWith(".svg")) {
+			return "image/svg+xml";
+		}
+		return "application/octet-stream";
 	}
 }
