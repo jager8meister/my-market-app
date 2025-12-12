@@ -3,10 +3,8 @@ package ru.yandex.practicum.mymarket.service.impl;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +21,7 @@ import ru.yandex.practicum.mymarket.mapper.CartMapper;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.model.CartEntry;
+import ru.yandex.practicum.mymarket.service.session.SessionCartStorage;
 
 @Slf4j
 @Service
@@ -31,8 +30,7 @@ public class CartServiceImpl implements CartService {
 
 	private final ItemRepository itemRepository;
 	private final CartMapper cartMapper;
-
-	private Map<Long, Integer> itemIdToCount = new HashMap<>();
+	private final SessionCartStorage cartStorage;
 
 	@Override
 	@Transactional(readOnly = true)
@@ -41,6 +39,7 @@ public class CartServiceImpl implements CartService {
 		if (itemId == null) {
 			return;
 		}
+		Map<Long, Integer> itemIdToCount = cartStorage.getCart();
 		itemRepository.findById(itemId).ifPresent(item -> {
 			int currentCount = itemIdToCount.getOrDefault(itemId, 0);
 			itemIdToCount.put(itemId, currentCount + 1);
@@ -54,6 +53,7 @@ public class CartServiceImpl implements CartService {
 		if (itemId == null) {
 			return;
 		}
+		Map<Long, Integer> itemIdToCount = cartStorage.getCart();
 		Integer current = itemIdToCount.get(itemId);
 		if (current == null || current <= 0) {
 			return;
@@ -71,12 +71,13 @@ public class CartServiceImpl implements CartService {
 		if (itemId == null) {
 			return;
 		}
-		itemIdToCount.remove(itemId);
+		cartStorage.getCart().remove(itemId);
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public List<CartEntry> getItems() {
+		Map<Long, Integer> itemIdToCount = cartStorage.getCart();
 		if (itemIdToCount.isEmpty()) {
 			return new ArrayList<>();
 		}
@@ -104,7 +105,7 @@ public class CartServiceImpl implements CartService {
 	@Override
 	public void clear() {
 		log.info("clear called - clearing cart");
-		itemIdToCount.clear();
+		cartStorage.clear();
 	}
 
 	@Override
