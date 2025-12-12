@@ -126,7 +126,7 @@ public class CartServiceImpl implements CartService {
 	@Override
 	public String updateCart(CartUpdateRequestDto request) {
 		log.debug("updateCart called with request: {}", request);
-		request.getAction().execute(this, request.getId());
+		applyCartAction(request.getAction(), request.getId());
 
 		return "redirect:/cart/items";
 	}
@@ -134,7 +134,7 @@ public class CartServiceImpl implements CartService {
 	@Override
 	public String changeItemCount(ChangeItemCountRequestDto request) {
 		log.debug("changeItemCount called with request: {}", request);
-		request.getAction().execute(this, request.getId());
+		applyCartAction(request.getAction(), request.getId());
 
 		String encodedSearch = request.getSearch() == null ? "" : URLEncoder.encode(request.getSearch(), StandardCharsets.UTF_8);
 		String encodedSort = request.getSort() == null ? "NO" : request.getSort().name();
@@ -147,8 +147,16 @@ public class CartServiceImpl implements CartService {
 	@Override
 	public String changeItemCountOnDetails(Long id, CartAction action) {
 		log.debug("changeItemCountOnDetails called with id: {}, action: {}", id, action);
-		action.execute(this, id);
+		applyCartAction(action, id);
 
 		return "redirect:/items/" + id;
+	}
+
+	private void applyCartAction(CartAction action, Long itemId) {
+		switch (action) {
+			case PLUS -> addItem(itemId);
+			case MINUS -> removeOne(itemId);
+			case DELETE -> removeAll(itemId);
+		}
 	}
 }

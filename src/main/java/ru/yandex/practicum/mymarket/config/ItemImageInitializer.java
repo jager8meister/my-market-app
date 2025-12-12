@@ -27,6 +27,7 @@ public class ItemImageInitializer {
 
 	private final ItemRepository itemRepository;
 	private final ItemImageRepository itemImageRepository;
+	private static final String DEFAULT_IMG_PATH = "images/android_phone.png";
 
 	@EventListener(ApplicationReadyEvent.class)
 	public void fillImagesIfMissing() {
@@ -44,11 +45,13 @@ public class ItemImageInitializer {
 				continue;
 			}
 
-			if (item.getImgPath() == null || item.getImgPath().isBlank()) {
-				throw new ImageInitializationException("Failed to load image for item " + item.getId() + ": image path is empty");
+			String imgPath = item.getImgPath();
+			if (imgPath == null || imgPath.isBlank()) {
+				log.warn("Item {} has empty image path, using default {}", item.getId(), DEFAULT_IMG_PATH);
+				imgPath = DEFAULT_IMG_PATH;
 			}
 
-			String resourcePath = "static/" + item.getImgPath();
+			String resourcePath = "static/" + imgPath;
 			ClassPathResource resource = new ClassPathResource(resourcePath);
 
 			if (!resource.exists()) {
@@ -60,7 +63,7 @@ public class ItemImageInitializer {
 				ItemImageEntity image = new ItemImageEntity();
 				image.setItem(item);
 				image.setData(data);
-				image.setContentType(resolveContentType(item.getImgPath()));
+				image.setContentType(resolveContentType(imgPath));
 				itemImageRepository.save(image);
 				log.debug("Loaded image for item id: {}", item.getId());
 			} catch (IOException e) {
