@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 
@@ -45,9 +46,10 @@ class ItemServiceImplTest {
 		itemRepository.saveSync(new ItemEntity(2L, "C Phone", "desc", 300L, "img2"));
 		itemRepository.saveSync(new ItemEntity(3L, "B Phone", "desc", 200L, "img3"));
 
-		ItemsFilterRequestDto request = new ItemsFilterRequestDto("phone", SortType.ALPHA, 1, 2);
+		ItemsFilterRequestDto filter = new ItemsFilterRequestDto("phone", SortType.ALPHA);
+		org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 2);
 
-		StepVerifier.create(itemService.getItems(request).collectList())
+		StepVerifier.create(itemService.getItems(filter, pageable).map(Page::getContent))
 				.assertNext(list -> {
 					List<String> titles = list.stream().map(ItemResponseDto::title).toList();
 					org.junit.jupiter.api.Assertions.assertEquals(List.of("A Phone", "B Phone"), titles);
@@ -77,9 +79,10 @@ class ItemServiceImplTest {
 		itemRepository.saveSync(new ItemEntity(11L, "Y", "desc", 100L, "img"));
 		itemRepository.saveSync(new ItemEntity(12L, "Z", "desc", 200L, "img"));
 
-		ItemsFilterRequestDto request = new ItemsFilterRequestDto(null, SortType.PRICE, 1, 3);
+		ItemsFilterRequestDto filter = new ItemsFilterRequestDto(null, SortType.PRICE);
+		org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 3);
 
-		StepVerifier.create(itemService.getItems(request).collectList())
+		StepVerifier.create(itemService.getItems(filter, pageable).map(Page::getContent))
 				.assertNext(list -> {
 					List<Long> prices = list.stream().map(ItemResponseDto::price).toList();
 					org.junit.jupiter.api.Assertions.assertEquals(List.of(100L, 200L, 300L), prices);
@@ -93,9 +96,10 @@ class ItemServiceImplTest {
 		itemRepository.saveSync(new ItemEntity(21L, "B", "desc", 2L, "img"));
 		itemRepository.saveSync(new ItemEntity(22L, "C", "desc", 3L, "img"));
 
-		ItemsFilterRequestDto request = new ItemsFilterRequestDto(null, SortType.NO, 2, 2);
+		ItemsFilterRequestDto filter = new ItemsFilterRequestDto(null, SortType.NO);
+		org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(1, 2);
 
-		StepVerifier.create(itemService.getItems(request).collectList())
+		StepVerifier.create(itemService.getItems(filter, pageable).map(Page::getContent))
 				.assertNext(list -> org.junit.jupiter.api.Assertions.assertEquals(1, list.size()))
 				.verifyComplete();
 	}

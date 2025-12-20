@@ -38,15 +38,18 @@ class ApiItemsControllerTest {
 	@Test
 	void getItems_returnsItemsFromService() {
 		ItemResponseDto dto = new ItemResponseDto(1L, "Title", "Desc", "img", 100L, 0);
-		itemService.itemsFlux = Flux.just(dto);
+		org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 5);
+		org.springframework.data.domain.Page<ItemResponseDto> page =
+			new org.springframework.data.domain.PageImpl<>(java.util.List.of(dto), pageable, 1);
+		itemService.itemsPage = Mono.just(page);
 
 		webTestClient.get()
 				.uri("/api/items?search=phone&pageNumber=1&pageSize=5")
 				.exchange()
 				.expectStatus().isOk()
-				.expectBodyList(ItemResponseDto.class)
-				.hasSize(1)
-				.contains(dto);
+				.expectBody()
+				.jsonPath("$.content").isArray()
+				.jsonPath("$.content.length()").isEqualTo(1);
 	}
 
 	@Test
@@ -104,13 +107,13 @@ class ApiItemsControllerTest {
 	}
 
 	private static class StubItemService implements ItemService {
-		private Flux<ItemResponseDto> itemsFlux = Flux.empty();
+		private Mono<org.springframework.data.domain.Page<ItemResponseDto>> itemsPage = Mono.empty();
 		private Mono<ItemDetailsResponseDto> itemDetails = Mono.empty();
 		private Mono<ResponseEntity<byte[]>> imageResponse = Mono.empty();
 
 		@Override
-		public Flux<ItemResponseDto> getItems(ItemsFilterRequestDto request) {
-			return itemsFlux;
+		public Mono<org.springframework.data.domain.Page<ItemResponseDto>> getItems(ItemsFilterRequestDto filter, org.springframework.data.domain.Pageable pageable) {
+			return itemsPage;
 		}
 
 		@Override

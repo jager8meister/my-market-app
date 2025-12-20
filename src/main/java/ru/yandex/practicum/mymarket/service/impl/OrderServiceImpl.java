@@ -22,8 +22,6 @@ import ru.yandex.practicum.mymarket.repository.OrderRepository;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.OrderService;
 import ru.yandex.practicum.mymarket.service.model.CartEntry;
-import ru.yandex.practicum.mymarket.service.model.OrderItemModel;
-import ru.yandex.practicum.mymarket.service.model.OrderModel;
 
 @Slf4j
 @Service
@@ -94,18 +92,13 @@ public class OrderServiceImpl implements OrderService {
 
 	private Mono<OrderResponseDto> buildOrderResponse(OrderEntity orderEntity) {
 		return orderItemRepository.findByOrderId(orderEntity.getId())
-				.map(item -> new OrderItemModel(item.getTitle(), item.getPrice(), item.getCount()))
+				.map(orderMapper::toOrderItemResponse)
 				.collectList()
-				.map(items -> {
-					List<OrderItemResponseDto> itemDtos = items.stream()
-							.map(orderMapper::toOrderItemResponse)
-							.toList();
-					return new OrderResponseDto(
-							orderEntity.getId(),
-							itemDtos,
-							orderEntity.getTotalSum(),
-							orderEntity.getCreatedAt()
-					);
-				});
+				.map(items -> new OrderResponseDto(
+						orderEntity.getId(),
+						items,
+						orderEntity.getTotalSum(),
+						orderEntity.getCreatedAt()
+				));
 	}
 }

@@ -24,7 +24,6 @@ import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
 import ru.yandex.practicum.mymarket.dto.response.CartItemResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.ItemResponseDto;
-import ru.yandex.practicum.mymarket.dto.response.PagingDto;
 import ru.yandex.practicum.mymarket.enums.SortType;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.ItemService;
@@ -39,20 +38,24 @@ public class ViewController {
 	private final OrderService orderService;
 
 	@GetMapping(value = {"/", "/items"}, produces = MediaType.TEXT_HTML_VALUE)
-	public Mono<Rendering> itemsPage(@ModelAttribute ItemsFilterRequestDto request, WebSession session) {
-		int pageNumber = request.pageNumber() == null ? 1 : Math.max(1, request.pageNumber());
-		int pageSize = request.pageSize() == null ? 5 : Math.max(1, request.pageSize());
-		SortType sort = request.sort() == null ? SortType.NO : request.sort();
+	public Mono<Rendering> itemsPage(
+			@ModelAttribute ItemsFilterRequestDto filter,
+			@RequestParam(defaultValue = "1") int pageNumber,
+			@RequestParam(defaultValue = "5") int pageSize,
+			WebSession session) {
+		SortType sort = filter.sort() == null ? SortType.NO : filter.sort();
+		org.springframework.data.domain.Pageable pageable =
+			org.springframework.data.domain.PageRequest.of(pageNumber - 1, pageSize);
 
 		return cartService.getCart(session)
 				.defaultIfEmpty(new CartStateResponseDto(Collections.emptyList(), 0L))
-				.zipWith(itemService.getItems(request).collectList())
+				.zipWith(itemService.getItems(filter, pageable))
 				.flatMap(tuple -> {
 					CartStateResponseDto cart = tuple.getT1();
-					List<ItemResponseDto> items = tuple.getT2();
+					var page = tuple.getT2();
 					Map<Long, Integer> cartCountMap = cart.items().stream()
 							.collect(Collectors.toMap(CartItemResponseDto::id, CartItemResponseDto::count));
-					return Flux.fromIterable(items)
+					return Flux.fromIterable(page.getContent())
 							.map(item -> {
 								int count = cartCountMap.getOrDefault(item.id(), 0);
 								return new ItemResponseDto(
@@ -65,16 +68,12 @@ public class ViewController {
 								);
 							})
 							.collectList()
-							.map(enrichedItems -> {
-								boolean hasNext = enrichedItems.size() >= pageSize;
-								PagingDto paging = new PagingDto(pageSize, pageNumber, pageNumber > 1, hasNext);
-								return Rendering.view("items")
-										.modelAttribute("items", enrichedItems)
-										.modelAttribute("paging", paging)
-										.modelAttribute("search", request.search())
-										.modelAttribute("sort", sort)
-										.build();
-							});
+							.map(enrichedItems -> Rendering.view("items")
+									.modelAttribute("items", enrichedItems)
+									.modelAttribute("page", page)
+									.modelAttribute("search", filter.search())
+									.modelAttribute("sort", sort)
+									.build());
 				});
 	}
 

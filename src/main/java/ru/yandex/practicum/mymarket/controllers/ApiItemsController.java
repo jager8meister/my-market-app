@@ -1,5 +1,6 @@
 package ru.yandex.practicum.mymarket.controllers;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,7 +13,6 @@ import org.springframework.web.server.WebSession;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
 import ru.yandex.practicum.mymarket.dto.request.ChangeItemCountRequestDto;
@@ -33,8 +33,13 @@ public class ApiItemsController {
 
 	@GetMapping({"", "items"})
 	@Operation(summary = "Get items list")
-	public Flux<ItemResponseDto> getItems(@ModelAttribute ItemsFilterRequestDto request) {
-		return itemService.getItems(request);
+	public Mono<Page<ItemResponseDto>> getItems(
+			@ModelAttribute ItemsFilterRequestDto filter,
+			@org.springframework.web.bind.annotation.RequestParam(defaultValue = "1") int pageNumber,
+			@org.springframework.web.bind.annotation.RequestParam(defaultValue = "5") int pageSize) {
+		org.springframework.data.domain.Pageable pageable =
+			org.springframework.data.domain.PageRequest.of(pageNumber - 1, pageSize);
+		return itemService.getItems(filter, pageable);
 	}
 
 	@PostMapping("/items")

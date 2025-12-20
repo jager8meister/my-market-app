@@ -2,6 +2,10 @@ package ru.yandex.practicum.mymarket.service.impl;
 
 import java.util.Comparator;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,12 +20,12 @@ import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
 import ru.yandex.practicum.mymarket.dto.response.ItemDetailsResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.ItemResponseDto;
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
+import ru.yandex.practicum.mymarket.entity.ItemImageEntity;
 import ru.yandex.practicum.mymarket.exception.ItemNotFoundException;
 import ru.yandex.practicum.mymarket.mapper.ItemMapper;
 import ru.yandex.practicum.mymarket.repository.ItemImageRepository;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 import ru.yandex.practicum.mymarket.service.ItemService;
-import ru.yandex.practicum.mymarket.service.model.ItemImageModel;
 import ru.yandex.practicum.mymarket.enums.SortType;
 
 @Slf4j
@@ -34,29 +38,37 @@ public class ItemServiceImpl implements ItemService {
 	private final ItemMapper itemMapper;
 
 	@Override
-	public Flux<ItemResponseDto> getItems(ItemsFilterRequestDto request) {
-		log.debug("getItems called with request: {}", request);
-		String search = request.search();
+	public Mono<Page<ItemResponseDto>> getItems(ItemsFilterRequestDto filter, Pageable pageable) {
+		log.debug("getItems called with filter: {}, pageable: {}", filter, pageable);
+		String search = filter.search();
 		boolean hasSearch = search != null && !search.isBlank();
 		Flux<ItemEntity> itemsFlux = hasSearch
 				? itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(search, search)
 				: itemRepository.findAll();
 
-		SortType sort = request.sort() == null ? SortType.NO : request.sort();
+		SortType sort = filter.sort() == null ? SortType.NO : filter.sort();
 		itemsFlux = switch (sort) {
 			case ALPHA -> itemsFlux.sort(Comparator.comparing(item -> item.getTitle().toLowerCase()));
 			case PRICE -> itemsFlux.sort(Comparator.comparingLong(ItemEntity::getPrice));
 			case NO -> itemsFlux;
 		};
 
-		int pageNumber = request.pageNumber() == null ? 1 : Math.max(1, request.pageNumber());
-		int pageSize = request.pageSize() == null ? 5 : Math.max(1, request.pageSize());
-		long offset = (long) (pageNumber - 1) * pageSize;
+		long offset = pageable.getOffset();
+		int pageSize = pageable.getPageSize();
 
-		return itemsFlux
-				.skip(offset)
-				.take(pageSize)
-				.map(item -> itemMapper.toItemResponse(item, 0));
+		return itemsFlux.count()
+				.zipWith(
+					itemsFlux
+						.skip(offset)
+						.take(pageSize)
+						.map(item -> itemMapper.toItemResponse(item, 0))
+						.collectList()
+				)
+				.map(tuple -> {
+					long total = tuple.getT1();
+					var content = tuple.getT2();
+					return new PageImpl<>(content, pageable, total);
+				});
 	}
 
 	@Override
@@ -72,16 +84,15 @@ public class ItemServiceImpl implements ItemService {
 		log.debug("getItemImageResponse called with id: {}", id);
 		return itemImageRepository.findByItemId(id)
 				.switchIfEmpty(Mono.error(new ItemNotFoundException("Item image not found for item id: " + id)))
-				.map(entity -> new ItemImageModel(entity.getData(), entity.getContentType()))
 				.map(this::toImageResponse);
 	}
 
-	private ResponseEntity<byte[]> toImageResponse(ItemImageModel image) {
-		byte[] data = image.getData();
+	private ResponseEntity<byte[]> toImageResponse(ItemImageEntity entity) {
+		byte[] data = entity.getData();
 		if (data == null || data.length == 0) {
 			return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
 		}
-		String contentType = image.getContentType();
+		String contentType = entity.getContentType();
 		MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
 		if (contentType != null && !contentType.isBlank()) {
 			mediaType = MediaType.parseMediaType(contentType);
