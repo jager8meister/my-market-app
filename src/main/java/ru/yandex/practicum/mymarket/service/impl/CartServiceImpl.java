@@ -112,6 +112,13 @@ public class CartServiceImpl implements CartService {
 		return getCartMap(session).doOnNext(cart -> cart.remove(itemId)).then();
 	}
 
+	@Override
+	public Mono<Integer> getItemCountInCart(Long itemId, WebSession session) {
+		log.debug("getItemCountInCart called with itemId: {}", itemId);
+		return getCartMap(session)
+				.map(cart -> cart.getOrDefault(itemId, 0));
+	}
+
 	private Mono<Map<Long, Integer>> getCartMap(WebSession session) {
 		Map<Long, Integer> cart = (Map<Long, Integer>) session.getAttributes()
 			.computeIfAbsent(CART_KEY, k -> new ConcurrentHashMap<>());

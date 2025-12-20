@@ -88,5 +88,10 @@ class ApiCartControllerTest {
 		public Mono<CartStateResponseDto> updateCart(CartUpdateRequestDto request, org.springframework.web.server.WebSession session) {
 			return updateResponse;
 		}
+
+		@Override
+		public Mono<Integer> getItemCountInCart(Long itemId, org.springframework.web.server.WebSession session) {
+			return Mono.just(0);
+		}
 	}
 }

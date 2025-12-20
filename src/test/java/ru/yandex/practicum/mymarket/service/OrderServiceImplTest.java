@@ -378,6 +378,11 @@ class OrderServiceImplTest {
 		public Mono<ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto> updateCart(ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto request, WebSession session) {
 			return Mono.empty();
 		}
+
+		@Override
+		public Mono<Integer> getItemCountInCart(Long itemId, WebSession session) {
+			return Mono.just(0);
+		}
 	}
 
 	private static class StubTransactionalOperator implements TransactionalOperator {

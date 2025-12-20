@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
+import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.ItemDetailsResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.ItemResponseDto;
 
@@ -13,7 +14,11 @@ public interface ItemService {
 
 	Mono<Page<ItemResponseDto>> getItems(ItemsFilterRequestDto filter, Pageable pageable);
 
+	Mono<Page<ItemResponseDto>> getItemsWithCartCounts(ItemsFilterRequestDto filter, Pageable pageable, CartStateResponseDto cart);
+
 	Mono<ItemDetailsResponseDto> getItem(Long id);
+
+	Mono<ItemDetailsResponseDto> getItemWithCartCount(Long id, int count);
 
 	Mono<ResponseEntity<byte[]>> getItemImageResponse(Long id);
 }

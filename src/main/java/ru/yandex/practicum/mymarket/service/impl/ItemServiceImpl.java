@@ -1,6 +1,8 @@
 package ru.yandex.practicum.mymarket.service.impl;
 
 import java.util.Comparator;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -17,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
+import ru.yandex.practicum.mymarket.dto.response.CartItemResponseDto;
+import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.ItemDetailsResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.ItemResponseDto;
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
@@ -73,12 +77,61 @@ public class ItemServiceImpl implements ItemService {
 	}
 
 	@Override
+	public Mono<Page<ItemResponseDto>> getItemsWithCartCounts(ItemsFilterRequestDto filter, Pageable pageable, CartStateResponseDto cart) {
+		log.debug("getItemsWithCartCounts called with filter: {}, pageable: {}, cart: {}", filter, pageable, cart);
+		Map<Long, Integer> cartCountMap = cart.items().stream()
+				.collect(Collectors.toMap(CartItemResponseDto::id, CartItemResponseDto::count));
+
+		String search = filter.search();
+		boolean hasSearch = search != null && !search.isBlank();
+		Flux<ItemEntity> itemsFlux = hasSearch
+				? itemRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(search, search)
+				: itemRepository.findAll();
+
+		SortType sort = filter.sort() == null ? SortType.NO : filter.sort();
+		itemsFlux = switch (sort) {
+			case ALPHA -> itemsFlux.sort(Comparator.comparing(item -> item.getTitle().toLowerCase()));
+			case PRICE -> itemsFlux.sort(Comparator.comparingLong(ItemEntity::getPrice));
+			case NO -> itemsFlux;
+		};
+
+		long offset = pageable.getOffset();
+		int pageSize = pageable.getPageSize();
+
+		return itemsFlux.count()
+				.zipWith(
+					itemsFlux
+						.skip(offset)
+						.take(pageSize)
+						.map(item -> {
+							int count = cartCountMap.getOrDefault(item.getId(), 0);
+							return itemMapper.toItemResponse(item, count);
+						})
+						.collectList()
+				)
+				.map(tuple -> {
+					long total = tuple.getT1();
+					var content = tuple.getT2();
+					return new PageImpl<>(content, pageable, total);
+				});
+	}
+
+	@Override
 	@Transactional(readOnly = true)
 	public Mono<ItemDetailsResponseDto> getItem(Long id) {
 		log.debug("getItem called with id: {}", id);
 		return itemRepository.findById(id)
 				.switchIfEmpty(Mono.error(new ItemNotFoundException("Item not found with id: " + id)))
 				.map(item -> itemMapper.toItemDetailsResponse(item, 0));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Mono<ItemDetailsResponseDto> getItemWithCartCount(Long id, int count) {
+		log.debug("getItemWithCartCount called with id: {}, count: {}", id, count);
+		return itemRepository.findById(id)
+				.switchIfEmpty(Mono.error(new ItemNotFoundException("Item not found with id: " + id)))
+				.map(item -> itemMapper.toItemDetailsResponse(item, count));
 	}
 
 	@Override

@@ -1,10 +1,7 @@
 package ru.yandex.practicum.mymarket.controllers;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,14 +19,11 @@ import org.springframework.web.server.WebSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto;
 import ru.yandex.practicum.mymarket.dto.request.ChangeItemCountRequestDto;
 import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
-import ru.yandex.practicum.mymarket.dto.response.CartItemResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
-import ru.yandex.practicum.mymarket.dto.response.ItemResponseDto;
 import ru.yandex.practicum.mymarket.enums.SortType;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.ItemService;
@@ -55,32 +49,13 @@ public class ViewController {
 
 		return cartService.getCart(session)
 				.defaultIfEmpty(new CartStateResponseDto(Collections.emptyList(), 0L))
-				.zipWith(itemService.getItems(filter, pageable))
-				.flatMap(tuple -> {
-					CartStateResponseDto cart = tuple.getT1();
-					var page = tuple.getT2();
-					Map<Long, Integer> cartCountMap = cart.items().stream()
-							.collect(Collectors.toMap(CartItemResponseDto::id, CartItemResponseDto::count));
-					return Flux.fromIterable(page.getContent())
-							.map(item -> {
-								int count = cartCountMap.getOrDefault(item.id(), 0);
-								return new ItemResponseDto(
-										item.id(),
-										item.title(),
-										item.description(),
-										item.imgPath(),
-										item.price(),
-										count
-								);
-							})
-							.collectList()
-							.map(enrichedItems -> Rendering.view("items")
-									.modelAttribute("items", enrichedItems)
-									.modelAttribute("page", page)
-									.modelAttribute("search", filter.search())
-									.modelAttribute("sort", sort)
-									.build());
-				});
+				.flatMap(cart -> itemService.getItemsWithCartCounts(filter, pageable, cart)
+						.map(page -> Rendering.view("items")
+								.modelAttribute("items", page.getContent())
+								.modelAttribute("page", page)
+								.modelAttribute("search", filter.search())
+								.modelAttribute("sort", sort)
+								.build()));
 	}
 
 	@PostMapping(value = "/items", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
@@ -93,29 +68,15 @@ public class ViewController {
 	public Mono<Rendering> itemPage(@PathVariable("id") @Positive Long id, WebSession session) {
 		return cartService.getCart(session)
 				.defaultIfEmpty(new CartStateResponseDto(Collections.emptyList(), 0L))
-				.zipWith(itemService.getItem(id))
+				.zipWith(cartService.getItemCountInCart(id, session))
 				.flatMap(tuple -> {
 					CartStateResponseDto cart = tuple.getT1();
-					var item = tuple.getT2();
-					return Flux.fromIterable(cart.items())
-							.filter(ci -> ci.id().equals(id))
-							.next()
-							.map(CartItemResponseDto::count)
-							.defaultIfEmpty(0)
-							.map(countInCart -> {
-								var enrichedItem = new ru.yandex.practicum.mymarket.dto.response.ItemDetailsResponseDto(
-										item.id(),
-										item.title(),
-										item.description(),
-										item.imgPath(),
-										item.price(),
-										countInCart
-								);
-								return Rendering.view("item")
-										.modelAttribute("item", enrichedItem)
-										.modelAttribute("total", cart.total())
-										.build();
-							});
+					int countInCart = tuple.getT2();
+					return itemService.getItemWithCartCount(id, countInCart)
+							.map(item -> Rendering.view("item")
+									.modelAttribute("item", item)
+									.modelAttribute("total", cart.total())
+									.build());
 				});
 	}
 

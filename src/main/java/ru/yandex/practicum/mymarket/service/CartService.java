@@ -22,4 +22,6 @@ public interface CartService {
 	Mono<CartStateResponseDto> getCart(WebSession session);
 
 	Mono<CartStateResponseDto> updateCart(CartUpdateRequestDto request, WebSession session);
+
+	Mono<Integer> getItemCountInCart(Long itemId, WebSession session);
 }

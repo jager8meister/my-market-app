@@ -117,7 +117,17 @@ class ApiItemsControllerTest {
 		}
 
 		@Override
+		public Mono<org.springframework.data.domain.Page<ItemResponseDto>> getItemsWithCartCounts(ItemsFilterRequestDto filter, org.springframework.data.domain.Pageable pageable, ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto cart) {
+			return itemsPage;
+		}
+
+		@Override
 		public Mono<ItemDetailsResponseDto> getItem(Long id) {
+			return itemDetails;
+		}
+
+		@Override
+		public Mono<ItemDetailsResponseDto> getItemWithCartCount(Long id, int count) {
 			return itemDetails;
 		}
 
@@ -159,6 +169,11 @@ class ApiItemsControllerTest {
 		@Override
 		public Mono<CartStateResponseDto> updateCart(ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto request, org.springframework.web.server.WebSession session) {
 			return updateResponse;
+		}
+
+		@Override
+		public Mono<Integer> getItemCountInCart(Long itemId, org.springframework.web.server.WebSession session) {
+			return Mono.just(0);
 		}
 	}
 }
