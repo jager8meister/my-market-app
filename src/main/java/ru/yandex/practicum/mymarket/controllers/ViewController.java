@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,9 +19,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.reactive.result.view.Rendering;
 import org.springframework.web.server.WebSession;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto;
 import ru.yandex.practicum.mymarket.dto.request.ChangeItemCountRequestDto;
 import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
 import ru.yandex.practicum.mymarket.dto.response.CartItemResponseDto;
@@ -33,6 +37,7 @@ import ru.yandex.practicum.mymarket.service.OrderService;
 
 @Controller
 @RequiredArgsConstructor
+@Validated
 public class ViewController {
 
 	private final ItemService itemService;
@@ -41,9 +46,9 @@ public class ViewController {
 
 	@GetMapping(value = {"/", "/items"}, produces = MediaType.TEXT_HTML_VALUE)
 	public Mono<Rendering> itemsPage(
-			@ModelAttribute ItemsFilterRequestDto filter,
-			@RequestParam(defaultValue = "1") int pageNumber,
-			@RequestParam(defaultValue = "5") int pageSize,
+			@ModelAttribute @Valid ItemsFilterRequestDto filter,
+			@RequestParam(defaultValue = "1") @Positive int pageNumber,
+			@RequestParam(defaultValue = "5") @Positive int pageSize,
 			WebSession session) {
 		SortType sort = filter.sort() == null ? SortType.NO : filter.sort();
 		Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
@@ -79,13 +84,13 @@ public class ViewController {
 	}
 
 	@PostMapping(value = "/items", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
-	public Mono<String> changeItemFromCatalog(@ModelAttribute ChangeItemCountRequestDto request, WebSession session) {
+	public Mono<String> changeItemFromCatalog(@Valid @ModelAttribute ChangeItemCountRequestDto request, WebSession session) {
 		return cartService.applyCartAction(request.action(), request.id(), session)
 				.thenReturn("redirect:/items");
 	}
 
 	@GetMapping(value = "/items/{id}", produces = MediaType.TEXT_HTML_VALUE)
-	public Mono<Rendering> itemPage(@PathVariable("id") Long id, WebSession session) {
+	public Mono<Rendering> itemPage(@PathVariable("id") @Positive Long id, WebSession session) {
 		return cartService.getCart(session)
 				.defaultIfEmpty(new CartStateResponseDto(Collections.emptyList(), 0L))
 				.zipWith(itemService.getItem(id))
@@ -115,8 +120,8 @@ public class ViewController {
 	}
 
 	@PostMapping(value = "/items/{id}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
-	public Mono<String> changeItemFromDetails(@PathVariable("id") Long id,
-	                                          @ModelAttribute ChangeItemCountRequestDto request,
+	public Mono<String> changeItemFromDetails(@PathVariable("id") @Positive Long id,
+	                                          @ModelAttribute @Valid ChangeItemCountRequestDto request,
 	                                          WebSession session) {
 		return cartService.applyCartAction(request.action(), id, session)
 				.thenReturn("redirect:/items/" + id);
@@ -133,7 +138,7 @@ public class ViewController {
 	}
 
 	@PostMapping(value = "/cart/items", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
-	public Mono<String> updateCartFromCart(@ModelAttribute ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto request,
+	public Mono<String> updateCartFromCart(@Valid @ModelAttribute CartUpdateRequestDto request,
 	                                       WebSession session) {
 		return cartService.applyCartAction(request.action(), request.id(), session)
 				.thenReturn("redirect:/cart/items");
@@ -155,7 +160,7 @@ public class ViewController {
 	}
 
 	@GetMapping(value = "/orders/{id}", produces = MediaType.TEXT_HTML_VALUE)
-	public Mono<Rendering> orderPage(@PathVariable("id") long id,
+	public Mono<Rendering> orderPage(@PathVariable("id") @Positive long id,
 	                                 @RequestParam(value = "newOrder", required = false) Boolean newOrder) {
 		return orderService.getOrder(id)
 				.map(order -> Rendering.view("order")

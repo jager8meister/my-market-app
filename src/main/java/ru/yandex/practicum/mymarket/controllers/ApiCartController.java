@@ -2,6 +2,7 @@ package ru.yandex.practicum.mymarket.controllers;
 
 import java.util.Collections;
 
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +21,7 @@ import ru.yandex.practicum.mymarket.service.CartService;
 
 @RestController
 @RequiredArgsConstructor
+@Validated
 @RequestMapping("/api/cart")
 @Tag(name = "Cart", description = "Cart API")
 public class ApiCartController {
