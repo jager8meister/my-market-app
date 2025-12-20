@@ -14,12 +14,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.transaction.reactive.TransactionCallback;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import org.springframework.web.server.WebSession;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
-import ru.yandex.practicum.mymarket.dto.response.OrderResponseDto;
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
 import ru.yandex.practicum.mymarket.entity.OrderEntity;
 import ru.yandex.practicum.mymarket.entity.OrderItemEntity;
@@ -45,7 +46,10 @@ class OrderServiceImplTest {
 		orderRepository = new StubOrderRepository();
 		orderItemRepository = new StubOrderItemRepository();
 		cartService = new StubCartService();
-		orderService = new OrderServiceImpl(orderRepository, orderItemRepository, cartService, new OrderMapperImpl());
+
+		org.springframework.transaction.reactive.TransactionalOperator transactionalOperator = new StubTransactionalOperator();
+
+		orderService = new OrderServiceImpl(orderRepository, orderItemRepository, cartService, new OrderMapperImpl(), transactionalOperator);
 
 		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/").build());
 		session = exchange.getSession().block();
@@ -373,6 +377,13 @@ class OrderServiceImplTest {
 		@Override
 		public Mono<ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto> updateCart(ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto request, WebSession session) {
 			return Mono.empty();
+		}
+	}
+
+	private static class StubTransactionalOperator implements TransactionalOperator {
+		@Override
+		public <T> Flux<T> execute(TransactionCallback<T> action) {
+			return Flux.from(action.doInTransaction(null));
 		}
 	}
 }

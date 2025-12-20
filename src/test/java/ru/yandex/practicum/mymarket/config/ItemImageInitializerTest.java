@@ -19,13 +19,15 @@ import ru.yandex.practicum.mymarket.repository.ItemRepository;
 class ItemImageInitializerTest {
 
 	@Test
-	void fillsMissingImagesFromClasspath() {
+	void fillsMissingImagesFromClasspath() throws InterruptedException {
 		StubItemRepository itemRepo = new StubItemRepository();
 		itemRepo.items.add(new ItemEntity(1L, "t", "d", 10L, "images/android_phone.png"));
 		StubItemImageRepository imageRepo = new StubItemImageRepository();
 
 		ItemImageInitializer initializer = new ItemImageInitializer(itemRepo, imageRepo);
 		initializer.fillImagesIfMissing();
+
+		Thread.sleep(500);
 
 		assertTrue(imageRepo.storage.containsKey(1L));
 		byte[] data = imageRepo.storage.get(1L).getData();

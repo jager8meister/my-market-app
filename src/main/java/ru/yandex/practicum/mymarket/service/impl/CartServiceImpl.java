@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.WebSession;
 
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import ru.yandex.practicum.mymarket.service.model.CartEntry;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class CartServiceImpl implements CartService {
 
 	private static final String CART_KEY = "cart";
@@ -48,6 +50,7 @@ public class CartServiceImpl implements CartService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Flux<CartEntry> getItems(WebSession session) {
 		return getCartMap(session)
 				.flatMapMany(cart -> cart.isEmpty()
@@ -65,6 +68,7 @@ public class CartServiceImpl implements CartService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Mono<Long> getTotalPrice(WebSession session) {
 		return getItems(session)
 				.map(entry -> entry.getItem().getPrice() * entry.getCount())
@@ -72,6 +76,7 @@ public class CartServiceImpl implements CartService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Mono<CartStateResponseDto> getCart(WebSession session) {
 		return getItems(session)
 				.map(cartMapper::toCartItemResponse)

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
 import ru.yandex.practicum.mymarket.entity.ItemImageEntity;
 import ru.yandex.practicum.mymarket.exception.ImageInitializationException;
@@ -54,25 +55,30 @@ public class ItemImageInitializer {
 			imgPath = DEFAULT_IMG_PATH;
 		}
 
-		String resourcePath = "static/" + imgPath;
+		final String finalImgPath = imgPath;
+		String resourcePath = "static/" + finalImgPath;
 		ClassPathResource resource = new ClassPathResource(resourcePath);
 
 		if (!resource.exists()) {
 			return Mono.error(new ImageInitializationException("Failed to load image for item " + item.getId() + ": resource " + resourcePath + " not found"));
 		}
 
-		try (InputStream inputStream = resource.getInputStream()) {
-			byte[] data = inputStream.readAllBytes();
-			ItemImageEntity image = new ItemImageEntity();
-			image.setItemId(item.getId());
-			image.setData(data);
-			image.setContentType(resolveContentType(imgPath));
-			return itemImageRepository.save(image)
-					.doOnSuccess(saved -> log.debug("Loaded image for item id: {}", item.getId()));
-		} catch (IOException e) {
-			log.error("Failed to load image for item {}: {}", item.getId(), e.getMessage());
-			return Mono.error(new ImageInitializationException("Failed to load image for item " + item.getId() + ": " + e.getMessage()));
-		}
+		return Mono.fromCallable(() -> {
+					try (InputStream inputStream = resource.getInputStream()) {
+						byte[] data = inputStream.readAllBytes();
+						ItemImageEntity image = new ItemImageEntity();
+						image.setItemId(item.getId());
+						image.setData(data);
+						image.setContentType(resolveContentType(finalImgPath));
+						return image;
+					} catch (IOException e) {
+						log.error("Failed to load image for item {}: {}", item.getId(), e.getMessage());
+						throw new ImageInitializationException("Failed to load image for item " + item.getId() + ": " + e.getMessage());
+					}
+				})
+				.subscribeOn(Schedulers.boundedElastic())
+				.flatMap(image -> itemImageRepository.save(image)
+						.doOnSuccess(saved -> log.debug("Loaded image for item id: {}", item.getId())));
 	}
 
 	private String resolveContentType(String imgPath) {

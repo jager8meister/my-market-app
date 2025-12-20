@@ -4,13 +4,13 @@ import java.util.Comparator;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +31,7 @@ import ru.yandex.practicum.mymarket.enums.SortType;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ItemServiceImpl implements ItemService {
 
 	private final ItemRepository itemRepository;
@@ -72,6 +73,7 @@ public class ItemServiceImpl implements ItemService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Mono<ItemDetailsResponseDto> getItem(Long id) {
 		log.debug("getItem called with id: {}", id);
 		return itemRepository.findById(id)
@@ -80,6 +82,7 @@ public class ItemServiceImpl implements ItemService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Mono<ResponseEntity<byte[]>> getItemImageResponse(Long id) {
 		log.debug("getItemImageResponse called with id: {}", id);
 		return itemImageRepository.findByItemId(id)
