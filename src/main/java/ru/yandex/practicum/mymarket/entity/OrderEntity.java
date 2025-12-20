@@ -1,24 +1,15 @@
 package ru.yandex.practicum.mymarket.entity;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Entity
-@Table(name = "orders")
+@Table("orders")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,20 +17,11 @@ import lombok.Setter;
 public class OrderEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<OrderItemEntity> items = new ArrayList<>();
-
-	@Column(nullable = false)
+	@Column("total_sum")
 	private long totalSum;
 
-	@Column(nullable = false)
+	@Column("created_at")
 	private LocalDateTime createdAt;
-
-	public void addItem(OrderItemEntity item) {
-		items.add(item);
-		item.setOrder(this);
-	}
 }

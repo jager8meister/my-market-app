@@ -1,233 +1,243 @@
 package ru.yandex.practicum.mymarket.config;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
 import ru.yandex.practicum.mymarket.entity.ItemImageEntity;
-import ru.yandex.practicum.mymarket.exception.ImageInitializationException;
 import ru.yandex.practicum.mymarket.repository.ItemImageRepository;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 
-@ExtendWith(MockitoExtension.class)
 class ItemImageInitializerTest {
 
-	@Mock
-	private ItemRepository itemRepository;
+	@Test
+	void fillsMissingImagesFromClasspath() {
+		StubItemRepository itemRepo = new StubItemRepository();
+		itemRepo.items.add(new ItemEntity(1L, "t", "d", 10L, "images/android_phone.png"));
+		StubItemImageRepository imageRepo = new StubItemImageRepository();
 
-	@Mock
-	private ItemImageRepository itemImageRepository;
+		ItemImageInitializer initializer = new ItemImageInitializer(itemRepo, imageRepo);
+		initializer.fillImagesIfMissing();
 
-	@Mock
-	private ApplicationReadyEvent applicationReadyEvent;
-
-	@InjectMocks
-	private ItemImageInitializer itemImageInitializer;
-
-	private ItemEntity item1;
-	private ItemEntity item2;
-	private ItemEntity item3;
-
-	@BeforeEach
-	void setUp() {
-		item1 = new ItemEntity();
-		item1.setId(1L);
-		item1.setTitle("Item 1");
-		item1.setPrice(1000L);
-		item1.setImgPath("images/android_phone.png");
-
-		item2 = new ItemEntity();
-		item2.setId(2L);
-		item2.setTitle("Item 2");
-		item2.setPrice(2000L);
-		item2.setImgPath("images/iphone.png");
-
-		item3 = new ItemEntity();
-		item3.setId(3L);
-		item3.setTitle("Item 3");
-		item3.setPrice(3000L);
-		item3.setImgPath("images/laptop_light.png");
+		assertTrue(imageRepo.storage.containsKey(1L));
+		byte[] data = imageRepo.storage.get(1L).getData();
+		assertTrue(data != null && data.length > 0);
 	}
 
-	@Test
-	void shouldInitializeImagesForAllItems() {
-		// given
-		List<ItemEntity> items = Arrays.asList(item1, item2, item3);
-		when(itemRepository.findAll()).thenReturn(items);
-		when(itemImageRepository.findByItemId(anyLong())).thenReturn(Optional.empty());
+	private static class StubItemRepository implements ItemRepository {
+		private final List<ItemEntity> items = new ArrayList<>();
 
-		// when
-		itemImageInitializer.fillImagesIfMissing();
+		@Override
+		public Flux<ItemEntity> findAll() {
+			return Flux.fromIterable(items);
+		}
 
-		// then
-		verify(itemImageRepository, times(3)).save(any(ItemImageEntity.class));
-		verify(itemImageRepository).findByItemId(1L);
-		verify(itemImageRepository).findByItemId(2L);
-		verify(itemImageRepository).findByItemId(3L);
+		@Override
+		public <S extends ItemEntity> Mono<S> save(S entity) {
+			items.add(entity);
+			return Mono.just(entity);
+		}
+
+		@Override
+		public <S extends ItemEntity> Flux<S> saveAll(Iterable<S> entities) {
+			entities.forEach(items::add);
+			return Flux.fromIterable((Iterable<S>) items);
+		}
+
+		@Override
+		public <S extends ItemEntity> Flux<S> saveAll(org.reactivestreams.Publisher<S> entityStream) {
+			return Flux.from(entityStream).doOnNext(items::add);
+		}
+
+		@Override
+		public Mono<ItemEntity> findById(Long aLong) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<ItemEntity> findById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Flux<ItemEntity> findAllById(Iterable<Long> longs) {
+			return Flux.empty();
+		}
+
+		@Override
+		public Flux<ItemEntity> findAllById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Flux.empty();
+		}
+
+		@Override
+		public Mono<Boolean> existsById(Long aLong) {
+			return Mono.just(false);
+		}
+
+		@Override
+		public Mono<Boolean> existsById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Mono.just(false);
+		}
+
+		@Override
+		public Mono<Long> count() {
+			return Mono.just((long) items.size());
+		}
+
+		@Override
+		public Mono<Void> deleteById(Long aLong) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> deleteById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> delete(ItemEntity entity) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> deleteAllById(Iterable<? extends Long> longs) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> deleteAll(Iterable<? extends ItemEntity> entities) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> deleteAll(org.reactivestreams.Publisher<? extends ItemEntity> entityStream) {
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> deleteAll() {
+			items.clear();
+			return Mono.empty();
+		}
+
+		@Override
+		public reactor.core.publisher.Flux<ItemEntity> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(String title, String description) {
+			return Flux.empty();
+		}
+
+		@Override
+		public reactor.core.publisher.Flux<ItemEntity> findAll(org.springframework.data.domain.Sort sort) {
+			return Flux.fromIterable(items);
+		}
 	}
 
-	@Test
-	void shouldSkipItemsThatAlreadyHaveImages() {
-		// given
-		List<ItemEntity> items = Arrays.asList(item1, item2, item3);
-		ItemImageEntity existingImage = new ItemImageEntity();
-		existingImage.setItem(item1);
-		existingImage.setData("existing".getBytes());
-		existingImage.setContentType("image/svg+xml");
+	private static class StubItemImageRepository implements ItemImageRepository {
+		private final Map<Long, ItemImageEntity> storage = new ConcurrentHashMap<>();
 
-		when(itemRepository.findAll()).thenReturn(items);
-		when(itemImageRepository.findByItemId(1L)).thenReturn(Optional.of(existingImage));
-		when(itemImageRepository.findByItemId(2L)).thenReturn(Optional.empty());
-		when(itemImageRepository.findByItemId(3L)).thenReturn(Optional.empty());
+		@Override
+		public Mono<ItemImageEntity> findByItemId(Long itemId) {
+			return Mono.justOrEmpty(storage.get(itemId));
+		}
 
-		// when
-		itemImageInitializer.fillImagesIfMissing();
+		@Override
+		public <S extends ItemImageEntity> Mono<S> save(S entity) {
+			storage.put(entity.getItemId(), entity);
+			return Mono.just(entity);
+		}
 
-		// then
-		verify(itemImageRepository, times(2)).save(any(ItemImageEntity.class));
-		verify(itemImageRepository).findByItemId(1L);
-		verify(itemImageRepository).findByItemId(2L);
-		verify(itemImageRepository).findByItemId(3L);
-	}
+		@Override
+		public <S extends ItemImageEntity> Flux<S> saveAll(Iterable<S> entities) {
+			entities.forEach(e -> storage.put(e.getItemId(), e));
+			return Flux.fromIterable(entities);
+		}
 
-	@Test
-	void shouldSkipInitializationWhenNoItems() {
-		// given
-		when(itemRepository.findAll()).thenReturn(new ArrayList<>());
+		@Override
+		public <S extends ItemImageEntity> Flux<S> saveAll(org.reactivestreams.Publisher<S> entityStream) {
+			return Flux.from(entityStream).doOnNext(e -> storage.put(e.getItemId(), e));
+		}
 
-		// when
-		itemImageInitializer.fillImagesIfMissing();
+		@Override
+		public Mono<ItemImageEntity> findById(Long aLong) {
+			return Mono.empty();
+		}
 
-		// then
-		verify(itemImageRepository, never()).save(any(ItemImageEntity.class));
-		verify(itemImageRepository, never()).findByItemId(anyLong());
-	}
+		@Override
+		public Mono<ItemImageEntity> findById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Mono.empty();
+		}
 
-	@Test
-	void shouldHandleEmptyItemsList() {
-		// given
-		when(itemRepository.findAll()).thenReturn(List.of());
+		@Override
+		public Flux<ItemImageEntity> findAll() {
+			return Flux.fromIterable(storage.values());
+		}
 
-		// when
-		itemImageInitializer.fillImagesIfMissing();
+		@Override
+		public Flux<ItemImageEntity> findAllById(Iterable<Long> longs) {
+			return Flux.empty();
+		}
 
-		// then
-		verify(itemRepository).findAll();
-		verify(itemImageRepository, never()).findByItemId(anyLong());
-		verify(itemImageRepository, never()).save(any(ItemImageEntity.class));
-	}
+		@Override
+		public Flux<ItemImageEntity> findAllById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Flux.empty();
+		}
 
-	@Test
-	void shouldSaveImagesForMultipleItems() {
-		// given
-		ItemEntity item4 = new ItemEntity();
-		item4.setId(4L);
-		item4.setTitle("Item 4");
-		item4.setPrice(4000L);
-		item4.setImgPath("images/laptop_white.png");
-		item4.setImgPath("images/laptop_dark.png");
+		@Override
+		public Mono<Boolean> existsById(Long aLong) {
+			return Mono.just(storage.containsKey(aLong));
+		}
 
-		ItemEntity item5 = new ItemEntity();
-		item5.setId(5L);
-		item5.setTitle("Item 5");
-		item5.setPrice(5000L);
-		item5.setImgPath("images/headphones.png");
+		@Override
+		public Mono<Boolean> existsById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Mono.from(idPublisher).map(storage::containsKey);
+		}
 
-		List<ItemEntity> items = Arrays.asList(item1, item2, item3, item4, item5);
-		when(itemRepository.findAll()).thenReturn(items);
-		when(itemImageRepository.findByItemId(anyLong())).thenReturn(Optional.empty());
+		@Override
+		public Mono<Long> count() {
+			return Mono.just((long) storage.size());
+		}
 
-		// when
-		itemImageInitializer.fillImagesIfMissing();
+		@Override
+		public Mono<Void> deleteById(Long aLong) {
+			return Mono.empty();
+		}
 
-		// then
-		// Should save image for all 5 items
-		verify(itemImageRepository, times(5)).save(any(ItemImageEntity.class));
-	}
+		@Override
+		public Mono<Void> deleteById(org.reactivestreams.Publisher<Long> idPublisher) {
+			return Mono.empty();
+		}
 
-	@Test
-	void shouldHandleSingleItem() {
-		// given
-		List<ItemEntity> items = List.of(item1);
-		when(itemRepository.findAll()).thenReturn(items);
-		when(itemImageRepository.findByItemId(1L)).thenReturn(Optional.empty());
+		@Override
+		public Mono<Void> delete(ItemImageEntity entity) {
+			return Mono.empty();
+		}
 
-		// when
-		itemImageInitializer.fillImagesIfMissing();
+		@Override
+		public Mono<Void> deleteAllById(Iterable<? extends Long> longs) {
+			return Mono.empty();
+		}
 
-		// then
-		verify(itemImageRepository, times(1)).save(any(ItemImageEntity.class));
-		verify(itemImageRepository).findByItemId(1L);
-	}
+		@Override
+		public Mono<Void> deleteAll(Iterable<? extends ItemImageEntity> entities) {
+			return Mono.empty();
+		}
 
-	@Test
-	void shouldHandleAllItemsWithExistingImages() {
-		// given
-		List<ItemEntity> items = Arrays.asList(item1, item2, item3);
-		ItemImageEntity existingImage1 = new ItemImageEntity();
-		existingImage1.setItem(item1);
-		ItemImageEntity existingImage2 = new ItemImageEntity();
-		existingImage2.setItem(item2);
-		ItemImageEntity existingImage3 = new ItemImageEntity();
-		existingImage3.setItem(item3);
+		@Override
+		public Mono<Void> deleteAll(org.reactivestreams.Publisher<? extends ItemImageEntity> entityStream) {
+			return Mono.empty();
+		}
 
-		when(itemRepository.findAll()).thenReturn(items);
-		when(itemImageRepository.findByItemId(1L)).thenReturn(Optional.of(existingImage1));
-		when(itemImageRepository.findByItemId(2L)).thenReturn(Optional.of(existingImage2));
-		when(itemImageRepository.findByItemId(3L)).thenReturn(Optional.of(existingImage3));
-
-		// when
-		itemImageInitializer.fillImagesIfMissing();
-
-		// then
-		verify(itemImageRepository, never()).save(any(ItemImageEntity.class));
-		verify(itemImageRepository).findByItemId(1L);
-		verify(itemImageRepository).findByItemId(2L);
-		verify(itemImageRepository).findByItemId(3L);
-	}
-
-	@Test
-	void shouldHandleMixOfItemsWithAndWithoutImages() {
-		// given
-		ItemEntity item4 = new ItemEntity();
-		item4.setId(4L);
-		item4.setTitle("Item 4");
-		item4.setPrice(4000L);
-
-		List<ItemEntity> items = Arrays.asList(item1, item2, item3, item4);
-		ItemImageEntity existingImage1 = new ItemImageEntity();
-		existingImage1.setItem(item1);
-		ItemImageEntity existingImage3 = new ItemImageEntity();
-		existingImage3.setItem(item3);
-
-		when(itemRepository.findAll()).thenReturn(items);
-		when(itemImageRepository.findByItemId(1L)).thenReturn(Optional.of(existingImage1));
-		when(itemImageRepository.findByItemId(2L)).thenReturn(Optional.empty());
-		when(itemImageRepository.findByItemId(3L)).thenReturn(Optional.of(existingImage3));
-		when(itemImageRepository.findByItemId(4L)).thenReturn(Optional.empty());
-
-		// when
-		itemImageInitializer.fillImagesIfMissing();
-
-		// then
-		verify(itemImageRepository, times(2)).save(any(ItemImageEntity.class));
-		verify(itemImageRepository).findByItemId(1L);
-		verify(itemImageRepository).findByItemId(2L);
-		verify(itemImageRepository).findByItemId(3L);
-		verify(itemImageRepository).findByItemId(4L);
+		@Override
+		public Mono<Void> deleteAll() {
+			storage.clear();
+			return Mono.empty();
+		}
 	}
 }

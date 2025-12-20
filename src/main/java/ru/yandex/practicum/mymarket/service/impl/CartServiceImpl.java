@@ -1,163 +1,115 @@
 package ru.yandex.practicum.mymarket.service.impl;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.ui.Model;
+import org.springframework.web.server.WebSession;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto;
-import ru.yandex.practicum.mymarket.dto.request.ChangeItemCountRequestDto;
-import ru.yandex.practicum.mymarket.dto.response.CartItemResponseDto;
+import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
 import ru.yandex.practicum.mymarket.enums.CartAction;
 import ru.yandex.practicum.mymarket.mapper.CartMapper;
 import ru.yandex.practicum.mymarket.repository.ItemRepository;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.model.CartEntry;
-import ru.yandex.practicum.mymarket.service.session.SessionCartStorage;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CartServiceImpl implements CartService {
 
+	private static final String CART_KEY = "cart";
+
 	private final ItemRepository itemRepository;
 	private final CartMapper cartMapper;
-	private final SessionCartStorage cartStorage;
 
 	@Override
-	@Transactional(readOnly = true)
-	public void addItem(Long itemId) {
-		log.debug("addItem called with itemId: {}", itemId);
-		if (itemId == null) {
-			return;
+	public Mono<Void> applyCartAction(CartAction action, Long itemId, WebSession session) {
+		if (action == null || itemId == null) {
+			return Mono.empty();
 		}
-		Map<Long, Integer> itemIdToCount = cartStorage.getCart();
-		itemRepository.findById(itemId).ifPresent(item -> {
-			int currentCount = itemIdToCount.getOrDefault(itemId, 0);
-			itemIdToCount.put(itemId, currentCount + 1);
-			log.debug("Item {} count increased to {}", itemId, currentCount + 1);
-		});
+		return switch (action) {
+			case PLUS -> addItem(itemId, session);
+			case MINUS -> removeOne(itemId, session);
+			case DELETE -> removeAll(itemId, session);
+		};
 	}
 
 	@Override
-	public void removeOne(Long itemId) {
-		log.debug("removeOne called with itemId: {}", itemId);
-		if (itemId == null) {
-			return;
-		}
-		Map<Long, Integer> itemIdToCount = cartStorage.getCart();
-		Integer current = itemIdToCount.get(itemId);
-		if (current == null || current <= 0) {
-			return;
-		}
-		if (current == 1) {
-			itemIdToCount.remove(itemId);
-		} else {
-			itemIdToCount.put(itemId, current - 1);
-		}
+	public Mono<Void> clear(WebSession session) {
+		session.getAttributes().remove(CART_KEY);
+		return Mono.empty();
 	}
 
 	@Override
-	public void removeAll(Long itemId) {
-		log.debug("removeAll called with itemId: {}", itemId);
-		if (itemId == null) {
-			return;
+	public Flux<CartEntry> getItems(WebSession session) {
+		return getCartMap(session)
+				.flatMapMany(cart -> cart.isEmpty()
+						? Flux.empty()
+						: itemRepository.findAllById(cart.keySet())
+						.flatMap(item -> toEntry(cart, item)));
+	}
+
+	private Mono<CartEntry> toEntry(Map<Long, Integer> cart, ItemEntity item) {
+		Integer count = cart.get(item.getId());
+		if (count == null || count <= 0) {
+			return Mono.empty();
 		}
-		cartStorage.getCart().remove(itemId);
+		return Mono.just(new CartEntry(item, count));
 	}
 
 	@Override
-	@Transactional(readOnly = true)
-	public List<CartEntry> getItems() {
-		Map<Long, Integer> itemIdToCount = cartStorage.getCart();
-		if (itemIdToCount.isEmpty()) {
-			return new ArrayList<>();
-		}
-
-		List<ItemEntity> items = itemRepository.findAllById(itemIdToCount.keySet());
-
-		List<CartEntry> entries = new ArrayList<>();
-		for (ItemEntity item : items) {
-			Integer count = itemIdToCount.get(item.getId());
-			if (count != null && count > 0) {
-				entries.add(new CartEntry(item, count));
-			}
-		}
-		return entries;
+	public Mono<Long> getTotalPrice(WebSession session) {
+		return getItems(session)
+				.map(entry -> entry.getItem().getPrice() * entry.getCount())
+				.reduce(0L, Long::sum);
 	}
 
 	@Override
-	@Transactional(readOnly = true)
-	public long getTotalPrice() {
-		return getItems().stream()
-				.mapToLong(entry -> entry.getItem().getPrice() * entry.getCount())
-				.sum();
-	}
-
-	@Override
-	public void clear() {
-		log.info("clear called - clearing cart");
-		cartStorage.clear();
-	}
-
-	@Override
-	public String showCart(Model model) {
-		log.debug("showCart called");
-		List<CartItemResponseDto> items = getItems()
-				.stream()
+	public Mono<CartStateResponseDto> getCart(WebSession session) {
+		return getItems(session)
 				.map(cartMapper::toCartItemResponse)
-				.toList();
-
-		long total = getTotalPrice();
-
-		model.addAttribute("items", items);
-		model.addAttribute("total", total);
-
-		return "cart";
+				.collectList()
+				.zipWith(getTotalPrice(session), (items, total) -> new CartStateResponseDto(items, total));
 	}
 
 	@Override
-	public String updateCart(CartUpdateRequestDto request) {
-		log.debug("updateCart called with request: {}", request);
-		applyCartAction(request.getAction(), request.getId());
-
-		return "redirect:/cart/items";
+	public Mono<CartStateResponseDto> updateCart(CartUpdateRequestDto request, WebSession session) {
+		return applyCartAction(request.action(), request.id(), session).then(getCart(session));
 	}
 
-	@Override
-	public String changeItemCount(ChangeItemCountRequestDto request) {
-		log.debug("changeItemCount called with request: {}", request);
-		applyCartAction(request.getAction(), request.getId());
-
-		String encodedSearch = request.getSearch() == null ? "" : URLEncoder.encode(request.getSearch(), StandardCharsets.UTF_8);
-		String encodedSort = request.getSort() == null ? "NO" : request.getSort().name();
-		int pageNumber = request.getPageNumber() != null ? request.getPageNumber() : 0;
-		int pageSize = request.getPageSize() != null ? request.getPageSize() : 5;
-
-		return "redirect:/items?search=" + encodedSearch + "&sort=" + encodedSort + "&pageNumber=" + pageNumber + "&pageSize=" + pageSize;
+	private Mono<Void> addItem(Long itemId, WebSession session) {
+		log.debug("addItem called with itemId: {}", itemId);
+		return getCartMap(session)
+				.zipWith(itemRepository.findById(itemId), (cart, item) -> {
+					int currentCount = cart.getOrDefault(itemId, 0);
+					cart.put(itemId, currentCount + 1);
+					return cart;
+				})
+				.then();
 	}
 
-	@Override
-	public String changeItemCountOnDetails(Long id, CartAction action) {
-		log.debug("changeItemCountOnDetails called with id: {}, action: {}", id, action);
-		applyCartAction(action, id);
-
-		return "redirect:/items/" + id;
+	private Mono<Void> removeOne(Long itemId, WebSession session) {
+		log.debug("removeOne called with itemId: {}", itemId);
+		return getCartMap(session)
+				.doOnNext(cart -> cart.computeIfPresent(itemId, (id, count) -> count > 1 ? count - 1 : null))
+				.then();
 	}
 
-	private void applyCartAction(CartAction action, Long itemId) {
-		switch (action) {
-			case PLUS -> addItem(itemId);
-			case MINUS -> removeOne(itemId);
-			case DELETE -> removeAll(itemId);
-		}
+	private Mono<Void> removeAll(Long itemId, WebSession session) {
+		log.debug("removeAll called with itemId: {}", itemId);
+		return getCartMap(session).doOnNext(cart -> cart.remove(itemId)).then();
+	}
+
+	private Mono<Map<Long, Integer>> getCartMap(WebSession session) {
+		Map<Long, Integer> cart = (Map<Long, Integer>) session.getAttributes()
+			.computeIfAbsent(CART_KEY, k -> new ConcurrentHashMap<>());
+		return Mono.just(cart);
 	}
 }

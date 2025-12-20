@@ -80,11 +80,11 @@
         </div>
     </div>
 
-    <div class="row p-2" th:each="itemsRow : ${items}">
-        <div class="col" th:each="item : ${itemsRow}">
-            <div class="card" th:if="${item.id != -1}">
+    <div class="row p-2">
+        <div class="col-md-4 mb-3" th:each="item : ${items}">
+            <div class="card h-100">
                 <a th:href="${'/items/' + item.id}">
-                    <img th:src="@{'/items/' + ${item.id} + '/image'}"
+                    <img th:src="@{'/api/items/' + ${item.id} + '/image'}"
                          class="card-img-top product-img"
                          alt="Изображение товара">
                 </a>
@@ -113,7 +113,6 @@
                     </form>
                 </div>
             </div>
-            <div th:unless="${item.id != -1}">&nbsp;</div>
         </div>
     </div>
 

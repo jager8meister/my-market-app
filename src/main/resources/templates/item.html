@@ -36,7 +36,7 @@
         <div class="col">
             <div class="card">
                 <img class="p-2 product-img"
-                     th:src="@{'/items/' + ${item.id} + '/image'}"
+                     th:src="@{'/api/items/' + ${item.id} + '/image'}"
                      alt="Изображение товара">
                 <div class="card-body">
                     <h5 class="card-title" th:text="${item.title}"></h5>

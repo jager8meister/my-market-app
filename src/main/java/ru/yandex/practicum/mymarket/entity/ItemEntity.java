@@ -1,18 +1,14 @@
 package ru.yandex.practicum.mymarket.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Entity
-@Table(name = "items")
+@Table("items")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,18 +16,17 @@ import lombok.Setter;
 public class ItemEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@Column(nullable = false)
+	@Column("title")
 	private String title;
 
-	@Column(length = 1000)
+	@Column("description")
 	private String description;
 
-	@Column(nullable = false)
+	@Column("price")
 	private long price;
 
-	@Column(name = "img_path")
+	@Column("img_path")
 	private String imgPath;
 }

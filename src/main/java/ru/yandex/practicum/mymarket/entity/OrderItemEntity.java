@@ -1,20 +1,14 @@
 package ru.yandex.practicum.mymarket.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Entity
-@Table(name = "order_items")
+@Table("order_items")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,20 +16,18 @@ import lombok.Setter;
 public class OrderItemEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@ManyToOne(optional = false)
-	@JoinColumn(name = "order_id", nullable = false)
-	private OrderEntity order;
+	@Column("order_id")
+	private Long orderId;
 
-	@Column(nullable = false)
+	@Column("title")
 	private String title;
 
-	@Column(nullable = false)
+	@Column("price")
 	private long price;
 
-	@Column(nullable = false)
+	@Column("count")
 	private int count;
 
 	public OrderItemEntity(String title, long price, int count) {
