@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,8 +46,7 @@ public class ViewController {
 			@RequestParam(defaultValue = "5") int pageSize,
 			WebSession session) {
 		SortType sort = filter.sort() == null ? SortType.NO : filter.sort();
-		org.springframework.data.domain.Pageable pageable =
-			org.springframework.data.domain.PageRequest.of(pageNumber - 1, pageSize);
+		Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
 
 		return cartService.getCart(session)
 				.defaultIfEmpty(new CartStateResponseDto(Collections.emptyList(), 0L))
