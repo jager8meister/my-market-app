@@ -1,12 +1,11 @@
 package ru.yandex.practicum.mymarket.repository;
 
-import java.util.Optional;
-
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import reactor.core.publisher.Mono;
 
 import ru.yandex.practicum.mymarket.entity.ItemImageEntity;
 
-public interface ItemImageRepository extends JpaRepository<ItemImageEntity, Long> {
+public interface ItemImageRepository extends ReactiveCrudRepository<ItemImageEntity, Long> {
 
-	Optional<ItemImageEntity> findByItemId(Long itemId);
+	Mono<ItemImageEntity> findByItemId(Long itemId);
 }

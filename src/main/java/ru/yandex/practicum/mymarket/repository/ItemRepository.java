@@ -1,13 +1,12 @@
 package ru.yandex.practicum.mymarket.repository;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.repository.reactive.ReactiveSortingRepository;
+import reactor.core.publisher.Flux;
 
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
 
-public interface ItemRepository extends JpaRepository<ItemEntity, Long> {
+public interface ItemRepository extends ReactiveCrudRepository<ItemEntity, Long>, ReactiveSortingRepository<ItemEntity, Long> {
 
-	Page<ItemEntity> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-			String title, String description, Pageable pageable);
+	Flux<ItemEntity> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(String title, String description);
 }

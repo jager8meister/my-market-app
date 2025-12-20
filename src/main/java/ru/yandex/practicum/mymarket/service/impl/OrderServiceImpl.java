@@ -2,132 +2,109 @@ package ru.yandex.practicum.mymarket.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.ui.Model;
+import org.springframework.transaction.reactive.TransactionalOperator;
+import org.springframework.web.server.WebSession;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import ru.yandex.practicum.mymarket.dto.request.OrderDetailsRequestDto;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.response.OrderResponseDto;
 import ru.yandex.practicum.mymarket.entity.OrderEntity;
 import ru.yandex.practicum.mymarket.entity.OrderItemEntity;
 import ru.yandex.practicum.mymarket.exception.EmptyCartException;
 import ru.yandex.practicum.mymarket.exception.OrderNotFoundException;
 import ru.yandex.practicum.mymarket.mapper.OrderMapper;
+import ru.yandex.practicum.mymarket.repository.OrderItemRepository;
 import ru.yandex.practicum.mymarket.repository.OrderRepository;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.OrderService;
 import ru.yandex.practicum.mymarket.service.model.CartEntry;
-import ru.yandex.practicum.mymarket.service.model.OrderItemModel;
-import ru.yandex.practicum.mymarket.service.model.OrderModel;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class OrderServiceImpl implements OrderService {
 
 	private final OrderRepository orderRepository;
+	private final OrderItemRepository orderItemRepository;
 	private final CartService cartService;
 	private final OrderMapper orderMapper;
+	private final TransactionalOperator transactionalOperator;
 
 	@Override
-	@Transactional
-	public OrderModel createOrderFromCart(List<CartEntry> cartEntries) {
+	public Mono<OrderResponseDto> buy(WebSession session) {
+		log.info("buy called - creating order from cart");
+		return cartService.getItems(session).collectList()
+				.flatMap(this::createOrderFromCart)
+				.as(transactionalOperator::transactional)
+				.flatMap(this::buildOrderResponse)
+				.flatMap(response -> cartService.clear(session).thenReturn(response));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Flux<OrderResponseDto> getOrders() {
+		return orderRepository.findAllByOrderByCreatedAtDesc()
+				.flatMap(this::buildOrderResponse);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Mono<OrderResponseDto> getOrder(long id) {
+		return orderRepository.findById(id)
+				.switchIfEmpty(Mono.error(new OrderNotFoundException("Order not found with id: " + id)))
+				.flatMap(this::buildOrderResponse);
+	}
+
+	private Mono<OrderEntity> createOrderFromCart(List<CartEntry> cartEntries) {
 		if (cartEntries == null || cartEntries.isEmpty()) {
 			log.warn("Attempt to create order from empty cart");
-			throw new EmptyCartException("Cannot create order from empty cart");
+			return Mono.error(new EmptyCartException("Cannot create order from empty cart"));
 		}
 
-		log.info("Creating order from cart with {} items", cartEntries.size());
-		OrderEntity orderEntity = new OrderEntity();
-		orderEntity.setCreatedAt(LocalDateTime.now());
-
-		long total = 0;
-
-		for (CartEntry entry : cartEntries) {
-			int count = entry.getCount();
-			if (count <= 0) {
-				continue;
-			}
-			long price = entry.getItem().getPrice();
-			long itemTotal = price * count;
-			total += itemTotal;
-
-			OrderItemEntity itemEntity = new OrderItemEntity(
-					entry.getItem().getTitle(),
-					price,
-					count
-			);
-			orderEntity.addItem(itemEntity);
-		}
-
-		orderEntity.setTotalSum(total);
-		OrderEntity savedOrder = orderRepository.save(orderEntity);
-		log.info("Order created successfully with id: {}, total: {}", savedOrder.getId(), total);
-
-		return orderMapper.toOrderModel(savedOrder);
+		OrderEntity order = new OrderEntity(null, calculateTotal(cartEntries), LocalDateTime.now());
+		return orderRepository.save(order)
+				.flatMap(saved -> saveOrderItems(saved.getId(), cartEntries).thenReturn(saved));
 	}
 
-	@Override
-	@Transactional(readOnly = true)
-	public Page<OrderModel> getOrders(Pageable pageable) {
-		log.debug("getOrders called with pageable: {}", pageable);
-		return orderRepository.findAllWithItems(pageable)
-				.map(orderMapper::toOrderModel);
+	private long calculateTotal(List<CartEntry> cartEntries) {
+		return cartEntries.stream()
+				.filter(entry -> entry.getCount() > 0)
+				.mapToLong(entry -> entry.getItem().getPrice() * entry.getCount())
+				.sum();
 	}
 
-	@Override
-	@Transactional(readOnly = true)
-	public Optional<OrderModel> getOrder(long id) {
-		log.debug("getOrder called with id: {}", id);
-		return orderRepository.findByIdWithItems(id)
-				.map(orderMapper::toOrderModel);
+	private Mono<Void> saveOrderItems(Long orderId, List<CartEntry> cartEntries) {
+		return Flux.fromIterable(cartEntries)
+				.filter(entry -> entry.getCount() > 0)
+				.flatMap(entry -> orderItemRepository.save(toOrderItem(orderId, entry)))
+				.then();
 	}
 
-	@Override
-	public String buy() {
-		log.info("buy called - creating order from cart");
-		List<CartEntry> cartEntries = cartService.getItems();
-		if (cartEntries.isEmpty()) {
-			throw new EmptyCartException("Cannot create order from empty cart");
-		}
-		OrderModel order = createOrderFromCart(cartEntries);
-		cartService.clear();
-		return "redirect:/orders/" + order.getId() + "?newOrder=true";
+	private OrderItemEntity toOrderItem(Long orderId, CartEntry entry) {
+		return new OrderItemEntity(
+				null,
+				orderId,
+				entry.getItem().getTitle(),
+				entry.getItem().getPrice(),
+				entry.getCount()
+		);
 	}
 
-	@Override
-	public String showOrders(Pageable pageable, Model model) {
-		log.debug("showOrders called with pageable: {}", pageable);
-		Page<OrderResponseDto> ordersPage = getOrders(pageable)
-				.map(orderMapper::toOrderResponse);
-
-		model.addAttribute("orders", ordersPage.getContent());
-		model.addAttribute("pageNumber", ordersPage.getNumber() + 1);
-		model.addAttribute("pageSize", ordersPage.getSize());
-		model.addAttribute("totalPages", ordersPage.getTotalPages());
-		model.addAttribute("hasNext", ordersPage.hasNext());
-		model.addAttribute("hasPrevious", ordersPage.hasPrevious());
-
-		return "orders";
-	}
-
-	@Override
-	public String showOrder(OrderDetailsRequestDto request, Model model) {
-		log.debug("showOrder called with request: {}", request);
-		OrderModel order = getOrder(request.getId())
-				.orElseThrow(() -> new OrderNotFoundException("Order not found with id: " + request.getId()));
-		List<OrderItemModel> items = order.getItems();
-
-		model.addAttribute("order", orderMapper.toOrderResponse(order));
-		model.addAttribute("items", items.stream().map(orderMapper::toOrderItemResponse).toList());
-		model.addAttribute("newOrder", request.isNewOrder());
-
-		return "order";
+	private Mono<OrderResponseDto> buildOrderResponse(OrderEntity orderEntity) {
+		return orderItemRepository.findByOrderId(orderEntity.getId())
+				.map(orderMapper::toOrderItemResponse)
+				.collectList()
+				.map(items -> new OrderResponseDto(
+						orderEntity.getId(),
+						items,
+						orderEntity.getTotalSum(),
+						orderEntity.getCreatedAt()
+				));
 	}
 }

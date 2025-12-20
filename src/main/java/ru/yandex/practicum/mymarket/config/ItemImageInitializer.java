@@ -2,7 +2,6 @@ package ru.yandex.practicum.mymarket.config;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import java.util.Locale;
 
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -13,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import ru.yandex.practicum.mymarket.entity.ItemEntity;
 import ru.yandex.practicum.mymarket.entity.ItemImageEntity;
 import ru.yandex.practicum.mymarket.exception.ImageInitializationException;
@@ -32,46 +33,52 @@ public class ItemImageInitializer {
 	@EventListener(ApplicationReadyEvent.class)
 	public void fillImagesIfMissing() {
 		log.info("Starting item image initialization");
-		List<ItemEntity> items = itemRepository.findAll();
+		itemRepository.findAll()
+				.flatMap(this::ensureImageForItem)
+				.onErrorContinue((ex, obj) -> log.error("Failed to init image for {}: {}", obj, ex.getMessage()))
+				.subscribe(
+						ignored -> {},
+						err -> log.error("Image init failed: {}", err.getMessage()),
+						() -> log.info("Item image initialization completed successfully")
+				);
+	}
 
-		if (items.isEmpty()) {
-			log.warn("No items found in database, skipping image initialization");
-			return;
+	private Mono<ItemImageEntity> ensureImageForItem(ItemEntity item) {
+		return itemImageRepository.findByItemId(item.getId())
+				.switchIfEmpty(loadAndSaveImage(item));
+	}
+
+	private Mono<ItemImageEntity> loadAndSaveImage(ItemEntity item) {
+		String imgPath = item.getImgPath();
+		if (imgPath == null || imgPath.isBlank()) {
+			log.warn("Item {} has empty image path, using default {}", item.getId(), DEFAULT_IMG_PATH);
+			imgPath = DEFAULT_IMG_PATH;
 		}
 
-		for (ItemEntity item : items) {
+		final String finalImgPath = imgPath;
+		String resourcePath = "static/" + finalImgPath;
+		ClassPathResource resource = new ClassPathResource(resourcePath);
 
-			if (itemImageRepository.findByItemId(item.getId()).isPresent()) {
-				continue;
-			}
-
-			String imgPath = item.getImgPath();
-			if (imgPath == null || imgPath.isBlank()) {
-				log.warn("Item {} has empty image path, using default {}", item.getId(), DEFAULT_IMG_PATH);
-				imgPath = DEFAULT_IMG_PATH;
-			}
-
-			String resourcePath = "static/" + imgPath;
-			ClassPathResource resource = new ClassPathResource(resourcePath);
-
-			if (!resource.exists()) {
-				throw new ImageInitializationException("Failed to load image for item " + item.getId() + ": resource " + resourcePath + " not found");
-			}
-
-			try (InputStream inputStream = resource.getInputStream()) {
-				byte[] data = inputStream.readAllBytes();
-				ItemImageEntity image = new ItemImageEntity();
-				image.setItem(item);
-				image.setData(data);
-				image.setContentType(resolveContentType(imgPath));
-				itemImageRepository.save(image);
-				log.debug("Loaded image for item id: {}", item.getId());
-			} catch (IOException e) {
-				log.error("Failed to load image for item {}: {}", item.getId(), e.getMessage());
-				throw new ImageInitializationException("Failed to load image for item " + item.getId() + ": " + e.getMessage());
-			}
+		if (!resource.exists()) {
+			return Mono.error(new ImageInitializationException("Failed to load image for item " + item.getId() + ": resource " + resourcePath + " not found"));
 		}
-		log.info("Item image initialization completed successfully");
+
+		return Mono.fromCallable(() -> {
+					try (InputStream inputStream = resource.getInputStream()) {
+						byte[] data = inputStream.readAllBytes();
+						ItemImageEntity image = new ItemImageEntity();
+						image.setItemId(item.getId());
+						image.setData(data);
+						image.setContentType(resolveContentType(finalImgPath));
+						return image;
+					} catch (IOException e) {
+						log.error("Failed to load image for item {}: {}", item.getId(), e.getMessage());
+						throw new ImageInitializationException("Failed to load image for item " + item.getId() + ": " + e.getMessage());
+					}
+				})
+				.subscribeOn(Schedulers.boundedElastic())
+				.flatMap(image -> itemImageRepository.save(image)
+						.doOnSuccess(saved -> log.debug("Loaded image for item id: {}", item.getId())));
 	}
 
 	private String resolveContentType(String imgPath) {

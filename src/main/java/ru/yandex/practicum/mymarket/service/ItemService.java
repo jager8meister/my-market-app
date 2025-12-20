@@ -1,28 +1,24 @@
 package ru.yandex.practicum.mymarket.service;
 
-import java.util.Optional;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.ui.Model;
 
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
-import ru.yandex.practicum.mymarket.entity.ItemEntity;
-import ru.yandex.practicum.mymarket.enums.CartAction;
-import ru.yandex.practicum.mymarket.service.model.ItemImageModel;
+import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
+import ru.yandex.practicum.mymarket.dto.response.ItemDetailsResponseDto;
+import ru.yandex.practicum.mymarket.dto.response.ItemResponseDto;
 
 public interface ItemService {
 
-	Page<ItemEntity> getItems(String search, Pageable pageable);
+	Mono<Page<ItemResponseDto>> getItems(ItemsFilterRequestDto filter, Pageable pageable);
 
-	Optional<ItemEntity> getItem(Long id);
+	Mono<Page<ItemResponseDto>> getItemsWithCartCounts(ItemsFilterRequestDto filter, Pageable pageable, CartStateResponseDto cart);
 
-	Optional<ItemImageModel> getItemImage(Long id);
+	Mono<ItemDetailsResponseDto> getItem(Long id);
 
-	String showItems(ItemsFilterRequestDto request, Model model);
+	Mono<ItemDetailsResponseDto> getItemWithCartCount(Long id, int count);
 
-	String showItemDetails(Long id, Model model);
-
-	ResponseEntity<byte[]> getItemImageResponse(Long id);
+	Mono<ResponseEntity<byte[]>> getItemImageResponse(Long id);
 }

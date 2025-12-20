@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Temporary files ###
+cookies*.txt
+nul

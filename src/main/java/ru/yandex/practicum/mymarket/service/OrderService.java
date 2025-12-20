@@ -1,27 +1,16 @@
 package ru.yandex.practicum.mymarket.service;
 
-import java.util.List;
-import java.util.Optional;
+import org.springframework.web.server.WebSession;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.ui.Model;
-
-import ru.yandex.practicum.mymarket.dto.request.OrderDetailsRequestDto;
-import ru.yandex.practicum.mymarket.service.model.CartEntry;
-import ru.yandex.practicum.mymarket.service.model.OrderModel;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.response.OrderResponseDto;
 
 public interface OrderService {
 
-	OrderModel createOrderFromCart(List<CartEntry> cartEntries);
+	Mono<OrderResponseDto> buy(WebSession session);
 
-	Page<OrderModel> getOrders(Pageable pageable);
+	Flux<OrderResponseDto> getOrders();
 
-	Optional<OrderModel> getOrder(long id);
-
-	String buy();
-
-	String showOrders(Pageable pageable, Model model);
-
-	String showOrder(OrderDetailsRequestDto request, Model model);
+	Mono<OrderResponseDto> getOrder(long id);
 }

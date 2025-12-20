@@ -1,33 +1,27 @@
 package ru.yandex.practicum.mymarket.service;
 
-import java.util.List;
+import org.springframework.web.server.WebSession;
 
-import org.springframework.ui.Model;
-
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto;
-import ru.yandex.practicum.mymarket.dto.request.ChangeItemCountRequestDto;
+import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
 import ru.yandex.practicum.mymarket.enums.CartAction;
 import ru.yandex.practicum.mymarket.service.model.CartEntry;
 
 public interface CartService {
 
-	void addItem(Long itemId);
+	Mono<Void> applyCartAction(CartAction action, Long itemId, WebSession session);
 
-	void removeOne(Long itemId);
+	Mono<Void> clear(WebSession session);
 
-	void removeAll(Long itemId);
+	Flux<CartEntry> getItems(WebSession session);
 
-	List<CartEntry> getItems();
+	Mono<Long> getTotalPrice(WebSession session);
 
-	long getTotalPrice();
+	Mono<CartStateResponseDto> getCart(WebSession session);
 
-	void clear();
+	Mono<CartStateResponseDto> updateCart(CartUpdateRequestDto request, WebSession session);
 
-	String showCart(Model model);
-
-	String updateCart(CartUpdateRequestDto request);
-
-	String changeItemCount(ChangeItemCountRequestDto request);
-
-	String changeItemCountOnDetails(Long id, CartAction action);
+	Mono<Integer> getItemCountInCart(Long itemId, WebSession session);
 }
