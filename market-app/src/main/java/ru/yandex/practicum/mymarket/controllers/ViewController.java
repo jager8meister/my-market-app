@@ -43,8 +43,14 @@ public class ViewController {
 
 	private Mono<String> getFormattedBalance() {
 		return userService.getCurrentUserId()
-				.flatMap(userService::getUserBalance)
-				.map(balance -> String.format("%,d ₽", balance));
+				.flatMap(userId -> userService.getUserBalance(userId)
+						.map(balance -> {
+							if (balance == -1L) {
+								return "Баланс недоступен";
+							}
+							return String.format("%,d ₽", balance);
+						})
+						.onErrorReturn("Баланс недоступен"));
 	}
 
 	@GetMapping(value = {"/", "/items"}, produces = MediaType.TEXT_HTML_VALUE)

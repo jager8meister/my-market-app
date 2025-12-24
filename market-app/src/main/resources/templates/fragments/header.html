@@ -17,7 +17,12 @@
                 <div class="col-md-4 text-end">
                     <h5 class="mb-0">
                         <span class="text-muted">Баланс:</span>
-                        <strong class="text-success" th:text="${balance}">0 ₽</strong>
+                        <strong
+                            th:classappend="${balance == 'Баланс недоступен'} ? 'text-warning' : 'text-success'"
+                            th:text="${balance}">0 ₽</strong>
+                        <small th:if="${balance == 'Баланс недоступен'}" class="d-block text-muted">
+                            (Сервис временно недоступен)
+                        </small>
                     </h5>
                 </div>
                 <div class="col-md-2 text-end">

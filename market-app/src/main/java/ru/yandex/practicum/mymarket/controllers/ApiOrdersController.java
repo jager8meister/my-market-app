@@ -15,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.response.OrderResponseDto;
+import ru.yandex.practicum.mymarket.exception.ServiceUnavailableException;
 import ru.yandex.practicum.mymarket.service.OrderService;
+import ru.yandex.practicum.mymarket.service.PaymentServiceHealthCheck;
 
 @RestController
 @RequiredArgsConstructor
@@ -25,10 +27,15 @@ import ru.yandex.practicum.mymarket.service.OrderService;
 public class ApiOrdersController {
 
 	private final OrderService orderService;
+	private final PaymentServiceHealthCheck paymentServiceHealthCheck;
 
 	@PostMapping("/buy")
 	@Operation(summary = "Create order from cart (buy)")
 	public Mono<OrderResponseDto> createOrder(WebSession session) {
+		if (!paymentServiceHealthCheck.isPaymentServiceAvailable()) {
+			return Mono.error(new ServiceUnavailableException(
+					"Payment service is currently unavailable. Please try again later."));
+		}
 		return orderService.buy(session);
 	}
 

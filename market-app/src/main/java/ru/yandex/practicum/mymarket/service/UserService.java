@@ -12,6 +12,4 @@ public interface UserService {
 	Mono<Long> getUserBalance(Long userId);
 
 	Mono<Boolean> hasEnoughBalance(Long userId, Long amount);
-
-	Mono<Void> deductBalance(Long userId, Long amount);
 }

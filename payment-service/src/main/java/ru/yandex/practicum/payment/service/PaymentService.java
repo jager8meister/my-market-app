@@ -25,6 +25,7 @@ public class PaymentService {
 
 	private final PaymentRepository paymentRepository;
 	private final PaymentMapper paymentMapper;
+	private final BalanceService balanceService;
 
 	public Mono<PaymentResponse> createPayment(PaymentRequest request) {
 		log.info("createPayment called with orderId: {}, amount: {}", request.getOrderId(), request.getAmount());
@@ -95,6 +96,10 @@ public class PaymentService {
 		return Mono.just(payment)
 				.flatMap(p -> {
 					log.debug("Processing payment {} for user {}, amount: {}", p.getId(), p.getUserId(), p.getAmount());
+					return balanceService.deductBalance(p.getUserId(), p.getAmount())
+							.thenReturn(p);
+				})
+				.flatMap(p -> {
 					p.setStatus(PaymentStatus.COMPLETED);
 					p.setUpdatedAt(LocalDateTime.now());
 					log.info("Payment {} completed successfully for user {}", p.getId(), p.getUserId());

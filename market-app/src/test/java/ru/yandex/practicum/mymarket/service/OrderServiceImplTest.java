@@ -418,7 +418,7 @@ class OrderServiceImplTest {
 
 	private static class StubPaymentClient extends PaymentClient {
 		public StubPaymentClient() {
-			super(null);
+			super(null, null);
 		}
 
 		@Override
@@ -456,11 +456,6 @@ class OrderServiceImplTest {
 		@Override
 		public Mono<Boolean> hasEnoughBalance(Long userId, Long amount) {
 			return Mono.just(true);
-		}
-
-		@Override
-		public Mono<Void> deductBalance(Long userId, Long amount) {
-			return Mono.empty();
 		}
 	}
 }

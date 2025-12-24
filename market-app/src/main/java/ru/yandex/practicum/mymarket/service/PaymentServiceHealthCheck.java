@@ -9,6 +9,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.Disposable;
@@ -20,15 +21,18 @@ import reactor.core.publisher.Mono;
 public class PaymentServiceHealthCheck {
 
 	private final WebClient webClient;
-	private final AtomicBoolean isAvailable = new AtomicBoolean(true);
+	private final String paymentServiceUrl;
+	private final AtomicBoolean isAvailable = new AtomicBoolean(false);
+	private final CircuitBreaker circuitBreaker;
 	private Disposable healthCheckSubscription;
 
 	public PaymentServiceHealthCheck(
 			WebClient.Builder webClientBuilder,
-			@Value("${payment.service.url}") String paymentServiceUrl) {
-		this.webClient = webClientBuilder
-				.baseUrl(paymentServiceUrl)
-				.build();
+			@Value("${payment.service.url}") String paymentServiceUrl,
+			CircuitBreaker paymentServiceCircuitBreaker) {
+		this.webClient = webClientBuilder.build();
+		this.paymentServiceUrl = paymentServiceUrl;
+		this.circuitBreaker = paymentServiceCircuitBreaker;
 	}
 
 	@EventListener(ApplicationReadyEvent.class)
@@ -62,7 +66,19 @@ public class PaymentServiceHealthCheck {
 	}
 
 	public boolean isPaymentServiceAvailable() {
-		return isAvailable.get();
+		boolean healthCheckStatus = isAvailable.get();
+		CircuitBreaker.State state = circuitBreaker.getState();
+		boolean circuitBreakerOk = state == CircuitBreaker.State.CLOSED
+				|| state == CircuitBreaker.State.HALF_OPEN;
+
+		boolean available = healthCheckStatus && circuitBreakerOk;
+
+		if (!available) {
+			log.debug("Payment service unavailable - Health: {}, CircuitBreaker: {}",
+					healthCheckStatus, state);
+		}
+
+		return available;
 	}
 
 	@PreDestroy

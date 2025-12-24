@@ -16,6 +16,8 @@ servers:
 tags:
   - name: Payments
     description: Операции с платежами
+  - name: Balances
+    description: Операции с балансами пользователей
 
 paths:
   /api/payments:
@@ -120,6 +122,43 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Платеж не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{userId}/balance:
+    get:
+      tags:
+        - Balances
+      summary: Получение баланса пользователя
+      description: Возвращает текущий баланс пользователя
+      operationId: getUserBalance
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID пользователя
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Баланс успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '404':
+          description: Пользователь не найден
           content:
             application/json:
               schema:
@@ -250,3 +289,20 @@ components:
           type: string
           description: Путь к ресурсу, где произошла ошибка
           example: "/api/payments"
+
+    BalanceResponse:
+      type: object
+      required:
+        - userId
+        - balance
+      properties:
+        userId:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 1
+        balance:
+          type: integer
+          format: int64
+          description: Баланс пользователя
+          example: 50000

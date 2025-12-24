@@ -31,6 +31,9 @@ class PaymentServiceTest {
 	@Mock
 	private PaymentMapper paymentMapper;
 
+	@Mock
+	private BalanceService balanceService;
+
 	@InjectMocks
 	private PaymentService paymentService;
 
@@ -69,6 +72,7 @@ class PaymentServiceTest {
 			entity.setId(1L);
 			return Mono.just(entity);
 		});
+		when(balanceService.deductBalance(any(Long.class), any(Long.class))).thenReturn(Mono.empty());
 		when(paymentMapper.toResponse(any(PaymentEntity.class))).thenReturn(paymentResponse);
 
 		Mono<PaymentResponse> result = paymentService.createPayment(paymentRequest);

@@ -1,5 +1,7 @@
 package ru.yandex.practicum.mymarket.controllers;
 
+import static org.mockito.Mockito.*;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -12,17 +14,21 @@ import reactor.core.publisher.Mono;
 import ru.yandex.practicum.mymarket.dto.response.OrderItemResponseDto;
 import ru.yandex.practicum.mymarket.dto.response.OrderResponseDto;
 import ru.yandex.practicum.mymarket.service.OrderService;
+import ru.yandex.practicum.mymarket.service.PaymentServiceHealthCheck;
 
 class ApiOrdersControllerTest {
 
 	private StubOrderService orderService;
+	private PaymentServiceHealthCheck healthCheck;
 
 	private WebTestClient webTestClient;
 
 	@BeforeEach
 	void setUp() {
 		orderService = new StubOrderService();
-		ApiOrdersController controller = new ApiOrdersController(orderService);
+		healthCheck = mock(PaymentServiceHealthCheck.class);
+		when(healthCheck.isPaymentServiceAvailable()).thenReturn(true);
+		ApiOrdersController controller = new ApiOrdersController(orderService, healthCheck);
 		webTestClient = WebTestClient.bindToController(controller).build();
 	}
 

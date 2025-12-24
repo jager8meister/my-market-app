@@ -57,6 +57,13 @@ public class GlobalExceptionHandler {
 				.body(new ApiErrorResponse(ex.getMessage()));
 	}
 
+	@ExceptionHandler(ServiceUnavailableException.class)
+	public ResponseEntity<ApiErrorResponse> handleServiceUnavailable(ServiceUnavailableException ex) {
+		log.warn("Service unavailable: {}", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+				.body(new ApiErrorResponse(ex.getMessage()));
+	}
+
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ResponseEntity<ApiErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
 		String message = ex.getBindingResult()

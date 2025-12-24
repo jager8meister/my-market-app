@@ -5,6 +5,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ public class ReactiveUserDetailsServiceImpl implements ReactiveUserDetailsServic
 	private final UserRepository userRepository;
 
 	@Override
+	@Transactional(readOnly = true)
 	public Mono<UserDetails> findByUsername(String username) {
 		log.debug("Loading user by username: {}", username);
 

@@ -15,9 +15,7 @@ public class PaymentClientConfig {
 
 	@Bean
 	public WebClient paymentWebClient(WebClient.Builder builder) {
-		return builder
-				.baseUrl(paymentServiceUrl)
-				.build();
+		return builder.build();
 	}
 
 	@Bean

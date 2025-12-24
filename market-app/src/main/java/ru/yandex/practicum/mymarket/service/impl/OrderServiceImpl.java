@@ -30,7 +30,6 @@ import ru.yandex.practicum.mymarket.service.model.CartEntry;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class OrderServiceImpl implements OrderService {
 
 	private final OrderRepository orderRepository;
@@ -62,21 +61,17 @@ public class OrderServiceImpl implements OrderService {
 														"Недостаточно средств для оформления заказа"));
 											}
 											log.info("Balance check passed. Creating order for user {}, amount: {}", userId, totalSum);
-											return createOrderFromCart(userId, cartEntries);
-										})
-										.flatMap(order -> {
-											log.info("Order created with id: {}, total: {}. Creating payment...", order.getId(), order.getTotalSum());
-											return createPaymentForOrder(order)
-													.flatMap(completedOrder -> {
-														log.debug("Payment successful. Deducting {} from user {} balance", completedOrder.getTotalSum(), userId);
-														return userService.deductBalance(userId, completedOrder.getTotalSum())
-																.thenReturn(completedOrder);
-													});
+											return createOrderFromCart(userId, cartEntries)
+													.as(transactionalOperator::transactional);
 										});
 							});
 				})
-				.as(transactionalOperator::transactional)
-				.flatMap(this::buildOrderResponse)
+				.flatMap(order -> {
+					log.info("Order created with id: {}, total: {}. Creating payment...", order.getId(), order.getTotalSum());
+					return createPaymentForOrder(order);
+				})
+				.flatMap(order -> buildOrderResponse(order)
+						.as(transactionalOperator::transactional))
 				.flatMap(response -> cartService.clear(session).thenReturn(response))
 				.doOnSuccess(order -> log.info("Order {} completed successfully", order.id()))
 				.doOnError(error -> log.error("Failed to create order: {}", error.getMessage()));
