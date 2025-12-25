@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <div th:fragment="header" class="bg-light py-3 mb-4">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-0">
+                        <span class="text-muted">Пользователь:</span>
+                        <strong sec:authentication="name">username</strong>
+                    </h5>
+                </div>
+                <div class="col-md-4 text-end">
+                    <h5 class="mb-0">
+                        <span class="text-muted">Баланс:</span>
+                        <strong
+                            th:classappend="${balance == 'Баланс недоступен'} ? 'text-warning' : 'text-success'"
+                            th:text="${balance}">0 ₽</strong>
+                        <small th:if="${balance == 'Баланс недоступен'}" class="d-block text-muted">
+                            (Сервис временно недоступен)
+                        </small>
+                    </h5>
+                </div>
+                <div class="col-md-2 text-end">
+                    <form th:action="@{/logout}" method="post" style="display:inline;">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            Выйти
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <title>Вход - My Market</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .user-badge {
+            transition: transform 0.2s;
+        }
+        .user-badge:hover {
+            transform: translateX(5px);
+        }
+    </style>
+</head>
+<body class="bg-light">
+<div class="login-container">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5">
+                <div class="text-center mb-4">
+                    <h1 class="display-5">
+                        <span class="badge text-bg-success">
+                            <i class="bi bi-shop"></i> My Market
+                        </span>
+                    </h1>
+                    <p class="text-muted">Интернет-магазин электроники</p>
+                </div>
+
+                <div class="card shadow">
+                    <div class="card-header bg-white py-3">
+                        <h4 class="text-center mb-0">
+                            <i class="bi bi-person-circle"></i> Вход в систему
+                        </h4>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="post" action="/login">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">
+                                    <i class="bi bi-person"></i> Имя пользователя
+                                </label>
+                                <input type="text" class="form-control form-control-lg"
+                                       id="username" name="username"
+                                       placeholder="Введите имя пользователя"
+                                       required autofocus>
+                            </div>
+                            <div class="mb-4">
+                                <label for="password" class="form-label">
+                                    <i class="bi bi-lock"></i> Пароль
+                                </label>
+                                <input type="password" class="form-control form-control-lg"
+                                       id="password" name="password"
+                                       placeholder="Введите пароль"
+                                       required>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-lg w-100">
+                                <i class="bi bi-box-arrow-in-right"></i> Войти
+                            </button>
+                        </form>
+
+                        <hr class="my-4">
+
+                        <div class="bg-light p-3 rounded">
+                            <h6 class="mb-3">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Тестовые аккаунты:</strong>
+                            </h6>
+
+                            <div class="d-grid gap-2">
+                                <div class="user-badge p-2 bg-white rounded border">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong class="text-primary">user1</strong>
+                                            <span class="text-muted">/ password1</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="user-badge p-2 bg-white rounded border">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong class="text-primary">user2</strong>
+                                            <span class="text-muted">/ password2</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="user-badge p-2 bg-white rounded border">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong class="text-primary">user3</strong>
+                                            <span class="text-muted">/ password3</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+</body>
+</html>

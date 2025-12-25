@@ -1,0 +1,41 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: payment-service
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/my_market_db
+    username: my_market_user
+    password: my_market_password
+    pool:
+      initial-size: 10
+      max-size: 20
+      max-idle-time: 30m
+
+  liquibase:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    ru.yandex.practicum.payment: DEBUG
+    org.springframework.r2dbc: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when-authorized

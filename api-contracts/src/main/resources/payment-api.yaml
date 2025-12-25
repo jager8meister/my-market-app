@@ -1,0 +1,308 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  description: API для обработки платежей в My Market Application
+  version: 1.0.0
+  contact:
+    name: My Market Team
+    email: support@mymarket.ru
+
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+  - url: http://payment-service:8081
+    description: Docker Compose environment
+
+tags:
+  - name: Payments
+    description: Операции с платежами
+  - name: Balances
+    description: Операции с балансами пользователей
+
+paths:
+  /api/payments:
+    post:
+      tags:
+        - Payments
+      summary: Создание нового платежа
+      description: Создает новый платеж для заказа
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Платеж успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Невалидные данные запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/{id}:
+    get:
+      tags:
+        - Payments
+      summary: Получение информации о платеже
+      description: Возвращает информацию о платеже по его ID
+      operationId: getPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID платежа
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Платеж найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          description: Платеж не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/{id}/cancel:
+    post:
+      tags:
+        - Payments
+      summary: Отмена платежа
+      description: Отменяет платеж, если он находится в статусе PENDING
+      operationId: cancelPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID платежа
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Платеж успешно отменен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Платеж не может быть отменен (неверный статус)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Платеж не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/users/{userId}/balance:
+    get:
+      tags:
+        - Balances
+      summary: Получение баланса пользователя
+      description: Возвращает текущий баланс пользователя
+      operationId: getUserBalance
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID пользователя
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            example: 1
+      responses:
+        '200':
+          description: Баланс успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    PaymentRequest:
+      type: object
+      required:
+        - orderId
+        - userId
+        - amount
+      properties:
+        orderId:
+          type: integer
+          format: int64
+          description: ID заказа, для которого создается платеж
+          minimum: 1
+          example: 123
+        userId:
+          type: integer
+          format: int64
+          description: ID пользователя, который оформляет платеж
+          minimum: 1
+          example: 1
+        amount:
+          type: integer
+          format: int64
+          description: Сумма платежа
+          example: 150000
+          minimum: 1
+        description:
+          type: string
+          description: Описание платежа
+          example: "Оплата заказа #123"
+          maxLength: 500
+
+    PaymentResponse:
+      type: object
+      required:
+        - id
+        - orderId
+        - userId
+        - amount
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Уникальный ID платежа
+          example: 1
+        orderId:
+          type: integer
+          format: int64
+          description: ID заказа
+          example: 123
+        userId:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 1
+        amount:
+          type: integer
+          format: int64
+          description: Сумма платежа
+          example: 150000
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        description:
+          type: string
+          description: Описание платежа
+          example: "Оплата заказа #123"
+        createdAt:
+          type: string
+          format: date-time
+          description: Дата и время создания платежа
+          example: "2025-12-21T01:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Дата и время последнего обновления
+          example: "2025-12-21T01:05:00Z"
+        failureReason:
+          type: string
+          description: Причина неудачи платежа (если status = FAILED)
+          example: "Insufficient funds"
+
+    PaymentStatus:
+      type: string
+      description: Статус платежа
+      enum:
+        - PENDING
+        - PROCESSING
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+      example: PENDING
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: Тип ошибки
+          example: "Bad Request"
+        message:
+          type: string
+          description: Описание ошибки
+          example: "Invalid payment amount"
+        timestamp:
+          type: string
+          format: date-time
+          description: Время возникновения ошибки
+          example: "2025-12-21T01:00:00Z"
+        path:
+          type: string
+          description: Путь к ресурсу, где произошла ошибка
+          example: "/api/payments"
+
+    BalanceResponse:
+      type: object
+      required:
+        - userId
+        - balance
+      properties:
+        userId:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 1
+        balance:
+          type: integer
+          format: int64
+          description: Баланс пользователя
+          example: 50000
