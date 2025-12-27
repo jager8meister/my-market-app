@@ -24,18 +24,47 @@ public class UserServiceImpl implements UserService {
 	private final PaymentClient paymentClient;
 
 	@Override
-	@Transactional(readOnly = true)
+	@Transactional
 	public Mono<UserEntity> getCurrentUser() {
 		return ReactiveSecurityContextHolder.getContext()
 				.map(SecurityContext::getAuthentication)
-				.map(Authentication::getName)
-				.flatMap(username -> userRepository.findByUsername(username))
+				.flatMap(auth -> {
+					String username = extractUsername(auth);
+					log.debug("Extracted username from authentication: {}", username);
+					return userRepository.findByUsername(username)
+							.switchIfEmpty(Mono.defer(() -> createUserIfNotExists(username)));
+				})
 				.switchIfEmpty(Mono.error(new UserNotFoundException("Current user not found")))
 				.doOnSuccess(user -> log.debug("Current user: {}", user.getUsername()));
 	}
 
+	private String extractUsername(Authentication auth) {
+		if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.user.OAuth2User) {
+			org.springframework.security.oauth2.core.user.OAuth2User oauth2User =
+				(org.springframework.security.oauth2.core.user.OAuth2User) auth.getPrincipal();
+			String username = oauth2User.getAttribute("preferred_username");
+			if (username == null) {
+				username = oauth2User.getAttribute("name");
+			}
+			if (username == null) {
+				username = auth.getName();
+			}
+			return username;
+		}
+		return auth.getName();
+	}
+
+	@Transactional
+	private Mono<UserEntity> createUserIfNotExists(String username) {
+		log.info("User {} not found in local DB, creating...", username);
+		UserEntity newUser = new UserEntity();
+		newUser.setUsername(username);
+		newUser.setPassword("");
+		return userRepository.save(newUser)
+				.doOnSuccess(user -> log.info("Created new user {} with ID {}", username, user.getId()));
+	}
+
 	@Override
-	@Transactional(readOnly = true)
 	public Mono<Long> getCurrentUserId() {
 		return getCurrentUser().map(UserEntity::getId);
 	}

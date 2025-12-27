@@ -19,6 +19,18 @@
         .user-badge:hover {
             transform: translateX(5px);
         }
+        .btn-keycloak {
+            background: linear-gradient(135deg, #4d95d1 0%, #00539F 100%);
+            border: none;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-keycloak:hover {
+            background: linear-gradient(135deg, #00539F 0%, #003d7a 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 83, 159, 0.3);
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -42,29 +54,12 @@
                         </h4>
                     </div>
                     <div class="card-body p-4">
-                        <form method="post" action="/login">
-                            <div class="mb-3">
-                                <label for="username" class="form-label">
-                                    <i class="bi bi-person"></i> Имя пользователя
-                                </label>
-                                <input type="text" class="form-control form-control-lg"
-                                       id="username" name="username"
-                                       placeholder="Введите имя пользователя"
-                                       required autofocus>
-                            </div>
-                            <div class="mb-4">
-                                <label for="password" class="form-label">
-                                    <i class="bi bi-lock"></i> Пароль
-                                </label>
-                                <input type="password" class="form-control form-control-lg"
-                                       id="password" name="password"
-                                       placeholder="Введите пароль"
-                                       required>
-                            </div>
-                            <button type="submit" class="btn btn-success btn-lg w-100">
-                                <i class="bi bi-box-arrow-in-right"></i> Войти
-                            </button>
-                        </form>
+                        <!-- OAuth2 Login Button -->
+                        <a href="/oauth2/authorization/keycloak"
+                           class="btn btn-keycloak btn-lg w-100 mb-3">
+                            <i class="bi bi-shield-lock"></i>
+                            Войти через Keycloak
+                        </a>
 
                         <hr class="my-4">
 

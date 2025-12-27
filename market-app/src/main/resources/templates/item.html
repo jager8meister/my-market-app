@@ -21,16 +21,19 @@
 
 <body class="bg-light">
 <div class="container p-2">
-    <div th:replace="~{fragments/header :: header}"></div>
+    <div th:replace="~{fragments/header :: header(${isAuthenticated}, ${username}, ${balance})}"></div>
     <div class="row p-2">
         <div class="col">
             <div class="hstack gap-3">
                 <h2>
                     <span class="badge text-bg-success">Детали товара</span>
                 </h2>
-                <a href="/orders" class="btn btn-secondary ms-auto bi bi-file-earmark-text">Заказы</a>
-                <a href="/cart/items" class="btn btn-secondary bi bi-cart4">Корзина</a>
-                <a href="/items" class="btn btn-secondary bi bi-arrow-left-square">На витрину</a>
+                <div sec:authorize="isAuthenticated()" class="ms-auto d-flex gap-2">
+                    <a href="/orders" class="btn btn-secondary bi bi-file-earmark-text">Заказы</a>
+                    <a href="/cart/items" class="btn btn-secondary bi bi-cart4">Корзина</a>
+                </div>
+                <a href="/items" class="btn btn-secondary bi bi-arrow-left-square"
+                   th:classappend="${#authorization.expression('isAnonymous()')} ? 'ms-auto' : ''">На витрину</a>
             </div>
         </div>
     </div>
@@ -47,15 +50,17 @@
                                   th:text="${item.price} + ' ₽'"></span>
                     </h5>
                     <p class="card-text" th:text="${item.description}"></p>
-                    <form th:action="@{${'/items/' + item.id}}" method="post">
-                        <div class="hstack gap-3">
-                            <button type="submit" class="btn btn-outline-secondary" name="action" value="MINUS">-</button>
-                            <span th:text="${item.count}"></span>
-                            <button type="submit" class="btn btn-outline-secondary" name="action" value="PLUS">+</button>
-                            <button type="submit" class="btn btn-warning ms-auto bi bi-cart4" name="action" value="PLUS"
-                                    th:if="${item.count == 0}"></button>
-                        </div>
-                    </form>
+                    <div sec:authorize="isAuthenticated()">
+                        <form th:action="@{${'/items/' + item.id}}" method="post">
+                            <div class="hstack gap-3">
+                                <button type="submit" class="btn btn-outline-secondary" name="action" value="MINUS">-</button>
+                                <span th:text="${item.count}"></span>
+                                <button type="submit" class="btn btn-outline-secondary" name="action" value="PLUS">+</button>
+                                <button type="submit" class="btn btn-warning ms-auto bi bi-cart4" name="action" value="PLUS"
+                                        th:if="${item.count == 0}"></button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

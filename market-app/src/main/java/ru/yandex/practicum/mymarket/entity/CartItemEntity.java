@@ -1,20 +1,22 @@
 package ru.yandex.practicum.mymarket.entity;
 
 import java.time.LocalDateTime;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Table("orders")
+@Table("cart_items")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderEntity {
+public class CartItemEntity {
 
 	@Id
 	private Long id;
@@ -22,28 +24,15 @@ public class OrderEntity {
 	@Column("user_id")
 	private Long userId;
 
-	@Column("total_sum")
-	private Long totalSum;
+	@Column("item_id")
+	private Long itemId;
 
-	@Column("status")
-	private OrderStatus status;
-
-	@Column("payment_id")
-	private String paymentId;
+	@Column("count")
+	private Integer count;
 
 	@Column("created_at")
 	private LocalDateTime createdAt;
 
 	@Column("updated_at")
 	private LocalDateTime updatedAt;
-
-	public OrderEntity(Long id, Long userId, Long totalSum, LocalDateTime createdAt) {
-		this.id = id;
-		this.userId = userId;
-		this.totalSum = totalSum;
-		this.status = OrderStatus.PENDING;
-		this.paymentId = null;
-		this.createdAt = createdAt;
-		this.updatedAt = createdAt;
-	}
 }

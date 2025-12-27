@@ -67,14 +67,33 @@ public class OrderServiceImpl implements OrderService {
 							});
 				})
 				.flatMap(order -> {
-					log.info("Order created with id: {}, total: {}. Creating payment...", order.getId(), order.getTotalSum());
-					return createPaymentForOrder(order);
+					log.info("Order created with id: {}, status: {}, total: {}. Creating payment...",
+							order.getId(), order.getStatus(), order.getTotalSum());
+					return createPaymentForOrder(order)
+							.flatMap(paidOrder -> {
+								log.info("Payment successful for order {}. Updating status to PAID", paidOrder.getId());
+								paidOrder.setStatus(ru.yandex.practicum.mymarket.entity.OrderStatus.PAID);
+								paidOrder.setUpdatedAt(LocalDateTime.now());
+								return orderRepository.save(paidOrder)
+										.as(transactionalOperator::transactional);
+							})
+							.onErrorResume(error -> {
+								log.error("Payment failed for order {}: {}. Updating status to FAILED",
+										order.getId(), error.getMessage());
+								order.setStatus(ru.yandex.practicum.mymarket.entity.OrderStatus.FAILED);
+								order.setUpdatedAt(LocalDateTime.now());
+								return orderRepository.save(order)
+										.as(transactionalOperator::transactional)
+										.then(Mono.error(error));
+							});
 				})
-				.flatMap(order -> buildOrderResponse(order)
-						.as(transactionalOperator::transactional))
-				.flatMap(response -> cartService.clear(session).thenReturn(response))
-				.doOnSuccess(order -> log.info("Order {} completed successfully", order.id()))
-				.doOnError(error -> log.error("Failed to create order: {}", error.getMessage()));
+				.flatMap(order -> buildOrderResponse(order))
+				.flatMap(response -> {
+					log.info("Order {} successfully paid. Clearing cart", response.id());
+					return cartService.clear(session).thenReturn(response);
+				})
+				.doOnSuccess(order -> log.info("Order {} completed successfully with status PAID", order.id()))
+				.doOnError(error -> log.error("Failed to complete order: {}", error.getMessage()));
 	}
 
 	@Override
@@ -95,10 +114,19 @@ public class OrderServiceImpl implements OrderService {
 	@Transactional(readOnly = true)
 	public Mono<OrderResponseDto> getOrder(long id) {
 		log.debug("getOrder called with id: {}", id);
-		return orderRepository.findById(id)
-				.switchIfEmpty(Mono.error(new OrderNotFoundException("Order not found with id: " + id)))
-				.doOnError(error -> log.warn("Order not found with id: {}", id))
-				.flatMap(this::buildOrderResponse)
+		return userService.getCurrentUserId()
+				.flatMap(currentUserId -> orderRepository.findById(id)
+						.switchIfEmpty(Mono.error(new OrderNotFoundException("Order not found with id: " + id)))
+						.doOnError(error -> log.warn("Order not found with id: {}", id))
+						.flatMap(order -> {
+							if (!order.getUserId().equals(currentUserId)) {
+								log.warn("User {} attempted to access order {} belonging to user {}",
+										currentUserId, id, order.getUserId());
+								return Mono.error(new ru.yandex.practicum.mymarket.exception.AccessDeniedException(
+										"Access denied to order " + id));
+							}
+							return buildOrderResponse(order);
+						}))
 				.doOnSuccess(order -> log.debug("getOrder returned order: id={}, items count: {}",
 						order.id(), order.items().size()));
 	}
@@ -167,8 +195,11 @@ public class OrderServiceImpl implements OrderService {
 		log.info("Creating payment for order {}, amount: {}, user: {}", order.getId(), order.getTotalSum(), order.getUserId());
 
 		return paymentClient.createPayment(order.getId(), order.getUserId(), order.getTotalSum(), description)
-				.doOnSuccess(payment -> log.info("Payment {} created for order {} with status {}",
-						payment.getId(), order.getId(), payment.getStatus()))
+				.doOnSuccess(payment -> {
+					log.info("Payment {} created for order {} with status {}",
+							payment.getId(), order.getId(), payment.getStatus());
+					order.setPaymentId(payment.getId().toString());
+				})
 				.onErrorMap(error -> {
 					log.error("Failed to create payment for order {}: {}", order.getId(), error.getMessage());
 					return new PaymentException("Не удалось создать платеж для заказа #" + order.getId());
