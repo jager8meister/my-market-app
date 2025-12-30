@@ -22,7 +22,7 @@
 
 <body class="bg-light">
 <div class="container p-2">
-    <div th:replace="~{fragments/header :: header}"></div>
+    <div th:replace="~{fragments/header :: header(${isAuthenticated}, ${username}, ${balance})}"></div>
     <div class="row p-2">
         <div class="col">
             <div class="hstack gap-3">

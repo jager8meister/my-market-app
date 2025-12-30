@@ -64,6 +64,13 @@ public class GlobalExceptionHandler {
 				.body(new ApiErrorResponse(ex.getMessage()));
 	}
 
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+		log.warn("Access denied: {}", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.FORBIDDEN)
+				.body(new ApiErrorResponse(ex.getMessage()));
+	}
+
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ResponseEntity<ApiErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
 		String message = ex.getBindingResult()

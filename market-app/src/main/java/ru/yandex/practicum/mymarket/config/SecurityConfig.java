@@ -4,57 +4,45 @@ import java.net.URI;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.ReactiveAuthenticationManager;
-import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
-import org.springframework.security.web.server.authentication.logout.RedirectServerLogoutSuccessHandler;
-
-import lombok.RequiredArgsConstructor;
-import ru.yandex.practicum.mymarket.security.ReactiveUserDetailsServiceImpl;
 
 @Configuration
 @EnableWebFluxSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
-	private final ReactiveUserDetailsServiceImpl userDetailsService;
-
 	@Bean
-	public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http,
-			ReactiveAuthenticationManager authenticationManager) {
-		RedirectServerLogoutSuccessHandler logoutSuccessHandler = new RedirectServerLogoutSuccessHandler();
-		logoutSuccessHandler.setLogoutSuccessUrl(URI.create("/login?logout"));
+	public SecurityWebFilterChain securityWebFilterChain(
+			ServerHttpSecurity http,
+			ReactiveClientRegistrationRepository clientRegistrationRepository) {
+
+		CustomLogoutSuccessHandler customLogoutHandler =
+			new CustomLogoutSuccessHandler(clientRegistrationRepository);
+
+		CustomAuthorizationRequestResolver authorizationRequestResolver =
+			new CustomAuthorizationRequestResolver(clientRegistrationRepository);
 
 		return http
 				.authorizeExchange(exchanges -> exchanges
-						.pathMatchers("/login", "/css/**", "/js/**", "/images/**").permitAll()
+						.pathMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**", "/login/**", "/oauth2/**", "/logout").permitAll()
+						.pathMatchers("/", "/items", "/items/**", "/api/items", "/api/items/**").permitAll()
 						.anyExchange().authenticated())
-				.formLogin(formLogin -> formLogin
-						.loginPage("/login")
-						.authenticationManager(authenticationManager)
-						.authenticationSuccessHandler(new RedirectServerAuthenticationSuccessHandler("/items")))
+				.exceptionHandling(exceptionHandling -> exceptionHandling
+						.authenticationEntryPoint((exchange, ex) -> {
+							exchange.getResponse().setStatusCode(HttpStatus.FOUND);
+							exchange.getResponse().getHeaders().setLocation(URI.create("/login"));
+							return exchange.getResponse().setComplete();
+						}))
+				.oauth2Login(oauth2 -> oauth2
+						.authorizationRequestResolver(authorizationRequestResolver)
+						.authorizationRedirectStrategy(new org.springframework.security.web.server.DefaultServerRedirectStrategy()))
 				.logout(logout -> logout
 						.logoutUrl("/logout")
-						.logoutSuccessHandler(logoutSuccessHandler))
+						.logoutSuccessHandler(customLogoutHandler))
 				.csrf(ServerHttpSecurity.CsrfSpec::disable)
 				.build();
-	}
-
-	@Bean
-	public ReactiveAuthenticationManager authenticationManager(PasswordEncoder passwordEncoder) {
-		UserDetailsRepositoryReactiveAuthenticationManager manager = new UserDetailsRepositoryReactiveAuthenticationManager(
-				userDetailsService);
-		manager.setPasswordEncoder(passwordEncoder);
-		return manager;
-	}
-
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
 	}
 }

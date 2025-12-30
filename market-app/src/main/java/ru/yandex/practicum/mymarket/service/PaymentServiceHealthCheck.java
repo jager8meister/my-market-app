@@ -30,7 +30,7 @@ public class PaymentServiceHealthCheck {
 			WebClient.Builder webClientBuilder,
 			@Value("${payment.service.url}") String paymentServiceUrl,
 			CircuitBreaker paymentServiceCircuitBreaker) {
-		this.webClient = webClientBuilder.build();
+		this.webClient = webClientBuilder.baseUrl(paymentServiceUrl).build();
 		this.paymentServiceUrl = paymentServiceUrl;
 		this.circuitBreaker = paymentServiceCircuitBreaker;
 	}

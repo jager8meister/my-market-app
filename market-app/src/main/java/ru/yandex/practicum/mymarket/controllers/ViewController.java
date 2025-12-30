@@ -18,18 +18,22 @@ import org.springframework.web.server.WebSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+import ru.yandex.practicum.mymarket.dto.model.CommonViewAttributes;
 import ru.yandex.practicum.mymarket.dto.request.CartActionWithNavigationDto;
 import ru.yandex.practicum.mymarket.dto.request.CartUpdateRequestDto;
 import ru.yandex.practicum.mymarket.dto.request.ChangeItemCountRequestDto;
 import ru.yandex.practicum.mymarket.dto.request.ItemsFilterRequestDto;
 import ru.yandex.practicum.mymarket.dto.response.CartStateResponseDto;
+import ru.yandex.practicum.mymarket.exception.UserNotFoundException;
 import ru.yandex.practicum.mymarket.service.CartService;
 import ru.yandex.practicum.mymarket.service.ItemService;
 import ru.yandex.practicum.mymarket.service.OrderService;
 import ru.yandex.practicum.mymarket.service.PaymentServiceHealthCheck;
 import ru.yandex.practicum.mymarket.service.UserService;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 @Validated
@@ -50,7 +54,47 @@ public class ViewController {
 							}
 							return String.format("%,d ₽", balance);
 						})
-						.onErrorReturn("Баланс недоступен"));
+						.onErrorReturn("Баланс недоступен"))
+				.onErrorResume(UserNotFoundException.class, ex -> {
+					log.warn("User not found when getting balance, user needs to re-login");
+					return Mono.just("Баланс недоступен");
+				});
+	}
+
+	private Mono<String> getFormattedBalanceForAnonymous() {
+		return userService.getCurrentUserId()
+				.flatMap(userId -> userService.getUserBalance(userId)
+						.map(balance -> {
+							if (balance == -1L) {
+								return "—";
+							}
+							return String.format("%,d ₽", balance);
+						})
+						.onErrorReturn("—"))
+				.onErrorReturn("—");
+	}
+
+	private Mono<CommonViewAttributes> getCommonAttributesForAuthenticated() {
+		return Mono.zip(
+				getFormattedBalance(),
+				userService.getCurrentUser().map(user -> user.getUsername()),
+				Mono.just(true)
+		).map(tuple -> new CommonViewAttributes(tuple.getT1(), tuple.getT2(), tuple.getT3()));
+	}
+
+	private Mono<CommonViewAttributes> getCommonAttributesForAnonymous() {
+		return Mono.zip(
+				getFormattedBalanceForAnonymous(),
+				userService.getCurrentUser().map(user -> user.getUsername()).onErrorReturn(""),
+				userService.getCurrentUserId().map(id -> true).onErrorReturn(false)
+		).map(tuple -> new CommonViewAttributes(tuple.getT1(), tuple.getT2(), tuple.getT3()));
+	}
+
+	private Rendering.Builder addCommonAttributes(Rendering.Builder builder, CommonViewAttributes attributes) {
+		return builder
+				.modelAttribute("balance", attributes.balance())
+				.modelAttribute("username", attributes.username())
+				.modelAttribute("isAuthenticated", attributes.isAuthenticated());
 	}
 
 	@GetMapping(value = {"/", "/items"}, produces = MediaType.TEXT_HTML_VALUE)
@@ -62,20 +106,21 @@ public class ViewController {
 		Pageable pageable = PageRequest.of(pageNumber - 1, pageSize);
 
 		return Mono.zip(
-				cartService.getCart(session),
-				getFormattedBalance()
+				cartService.getCart(session).onErrorReturn(new CartStateResponseDto(java.util.List.of(), 0L)),
+				getCommonAttributesForAnonymous()
 		)
 		.flatMap(tuple -> {
 			CartStateResponseDto cart = tuple.getT1();
-			String balance = tuple.getT2();
+			CommonViewAttributes commonAttrs = tuple.getT2();
 			return itemService.getItemsWithCartCounts(filter, pageable, cart)
-					.map(page -> Rendering.view("items")
-							.modelAttribute("items", page.getContent())
-							.modelAttribute("page", page)
-							.modelAttribute("search", filter.search())
-							.modelAttribute("sort", filter.sort())
-							.modelAttribute("balance", balance)
-							.build());
+					.map(page -> addCommonAttributes(
+							Rendering.view("items")
+									.modelAttribute("items", page.getContent())
+									.modelAttribute("page", page)
+									.modelAttribute("search", filter.search())
+									.modelAttribute("sort", filter.sort()),
+							commonAttrs
+					).build());
 		});
 	}
 
@@ -89,20 +134,21 @@ public class ViewController {
 	@GetMapping(value = "/items/{id}", produces = MediaType.TEXT_HTML_VALUE)
 	public Mono<Rendering> itemPage(@PathVariable("id") @Positive Long id, WebSession session) {
 		return Mono.zip(
-				cartService.getCart(session),
-				cartService.getItemCountInCart(id, session),
-				getFormattedBalance()
+				cartService.getCart(session).onErrorReturn(new CartStateResponseDto(java.util.List.of(), 0L)),
+				cartService.getItemCountInCart(id, session).onErrorReturn(0),
+				getCommonAttributesForAnonymous()
 		)
 		.flatMap(tuple -> {
 			CartStateResponseDto cart = tuple.getT1();
 			int countInCart = tuple.getT2();
-			String balance = tuple.getT3();
+			CommonViewAttributes commonAttrs = tuple.getT3();
 			return itemService.getItemWithCartCount(id, countInCart)
-					.map(item -> Rendering.view("item")
-							.modelAttribute("item", item)
-							.modelAttribute("total", cart.total())
-							.modelAttribute("balance", balance)
-							.build());
+					.map(item -> addCommonAttributes(
+							Rendering.view("item")
+									.modelAttribute("item", item)
+									.modelAttribute("total", cart.total()),
+							commonAttrs
+					).build());
 		});
 	}
 
@@ -119,24 +165,26 @@ public class ViewController {
 		boolean paymentServiceAvailable = paymentServiceHealthCheck.isPaymentServiceAvailable();
 		return Mono.zip(
 				cartService.getCart(session),
-				getFormattedBalance(),
+				getCommonAttributesForAuthenticated(),
 				userService.getCurrentUserId()
 		)
 		.flatMap(tuple -> {
 			CartStateResponseDto cart = tuple.getT1();
-			String balanceFormatted = tuple.getT2();
+			CommonViewAttributes commonAttrs = tuple.getT2();
 			Long userId = tuple.getT3();
 
 			return userService.getUserBalance(userId)
 					.map(balanceAmount -> {
 						boolean hasEnoughBalance = balanceAmount >= cart.total();
 
-						Rendering.Builder builder = Rendering.view("cart")
-								.modelAttribute("items", cart.items())
-								.modelAttribute("total", cart.total())
-								.modelAttribute("paymentServiceAvailable", paymentServiceAvailable)
-								.modelAttribute("balance", balanceFormatted)
-								.modelAttribute("hasEnoughBalance", hasEnoughBalance);
+						Rendering.Builder builder = addCommonAttributes(
+								Rendering.view("cart")
+										.modelAttribute("items", cart.items())
+										.modelAttribute("total", cart.total())
+										.modelAttribute("paymentServiceAvailable", paymentServiceAvailable)
+										.modelAttribute("hasEnoughBalance", hasEnoughBalance),
+								commonAttrs
+						);
 
 						if (error != null && !error.isBlank()) {
 							builder.modelAttribute("error", error);
@@ -144,6 +192,10 @@ public class ViewController {
 
 						return builder.build();
 					});
+		})
+		.onErrorResume(UserNotFoundException.class, ex -> {
+			log.warn("User not found in cartPage, redirecting to login");
+			return Mono.just(Rendering.redirectTo("/login?error=session_expired").build());
 		});
 	}
 
@@ -167,7 +219,6 @@ public class ViewController {
 					if (errorMessage == null || errorMessage.isBlank()) {
 						errorMessage = "An+error+occurred+while+processing+order";
 					} else {
-						// Simple URL encoding for error message
 						errorMessage = errorMessage.replace(" ", "+");
 					}
 					return Mono.just("redirect:/cart/items?error=" + errorMessage);
@@ -178,12 +229,17 @@ public class ViewController {
 	public Mono<Rendering> ordersPage() {
 		return Mono.zip(
 				orderService.getOrders().collectList(),
-				getFormattedBalance()
+				getCommonAttributesForAuthenticated()
 		)
-		.map(tuple -> Rendering.view("orders")
-				.modelAttribute("orders", tuple.getT1())
-				.modelAttribute("balance", tuple.getT2())
-				.build());
+		.map(tuple -> addCommonAttributes(
+				Rendering.view("orders")
+						.modelAttribute("orders", tuple.getT1()),
+				tuple.getT2()
+		).build())
+		.onErrorResume(UserNotFoundException.class, ex -> {
+			log.warn("User not found in ordersPage, redirecting to login");
+			return Mono.just(Rendering.redirectTo("/login?error=session_expired").build());
+		});
 	}
 
 	@GetMapping(value = "/orders/{id}", produces = MediaType.TEXT_HTML_VALUE)
@@ -191,12 +247,17 @@ public class ViewController {
 	                                 @RequestParam(value = "newOrder", required = false) Boolean newOrder) {
 		return Mono.zip(
 				orderService.getOrder(id),
-				getFormattedBalance()
+				getCommonAttributesForAuthenticated()
 		)
-		.map(tuple -> Rendering.view("order")
-				.modelAttribute("order", tuple.getT1())
-				.modelAttribute("newOrder", Optional.ofNullable(newOrder).orElse(false))
-				.modelAttribute("balance", tuple.getT2())
-				.build());
+		.map(tuple -> addCommonAttributes(
+				Rendering.view("order")
+						.modelAttribute("order", tuple.getT1())
+						.modelAttribute("newOrder", Optional.ofNullable(newOrder).orElse(false)),
+				tuple.getT2()
+		).build())
+		.onErrorResume(UserNotFoundException.class, ex -> {
+			log.warn("User not found in orderPage, redirecting to login");
+			return Mono.just(Rendering.redirectTo("/login?error=session_expired").build());
+		});
 	}
 }

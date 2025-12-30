@@ -23,6 +23,7 @@ services:
     image: redis:7-alpine
     container_name: my-market-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec
     ports:
       - "6379:6379"
     volumes:
@@ -44,15 +45,49 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
     ports:
       - "8081:8081"
     environment:
       SPRING_R2DBC_URL: r2dbc:postgresql://db:5432/my_market_db
       SPRING_R2DBC_USERNAME: my_market_user
       SPRING_R2DBC_PASSWORD: my_market_password
+      # Use JWK Set URI directly instead of issuer-uri to avoid localhost resolution issues
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://my-market-keycloak:8180/realms/my-market/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8180/realms/my-market
       JAVA_OPTS: "-XX:TieredStopAtLevel=1"
     networks:
       - market-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: my-market-keycloak
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8180
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8180
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+    ports:
+      - "8180:8180"
+    volumes:
+      - ./keycloak/my-market-realm.json:/opt/keycloak/data/import/my-market-realm.json:ro
+    networks:
+      - market-network
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 10s bash -c ':> /dev/tcp/127.0.0.1/8180' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
 
   app:
     build:
@@ -67,6 +102,8 @@ services:
         condition: service_healthy
       payment-service:
         condition: service_started
+      keycloak:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
@@ -76,6 +113,23 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PAYMENT_SERVICE_URL: http://payment-service:8081
+      # OAuth2 Resource Server (server-side JWT validation) - uses localhost to match browser-issued tokens
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8180/realms/my-market
+      # OAuth2 Client Provider - uses localhost for browser access
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8180/realms/my-market/protocol/openid-connect/auth
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_TOKEN_URI: http://my-market-keycloak:8180/realms/my-market/protocol/openid-connect/token
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_USER_INFO_URI: http://my-market-keycloak:8180/realms/my-market/protocol/openid-connect/userinfo
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_JWK_SET_URI: http://my-market-keycloak:8180/realms/my-market/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_END_SESSION_URI: http://localhost:8180/realms/my-market/protocol/openid-connect/logout
+      # OAuth2 Client Registration - User Login (Authorization Code Flow)
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID: market-app-client
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_SECRET: market-app-secret
+      # OAuth2 Client Provider for Service-to-Service
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_INTERNAL_TOKEN_URI: http://my-market-keycloak:8180/realms/my-market/protocol/openid-connect/token
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_INTERNAL_JWK_SET_URI: http://my-market-keycloak:8180/realms/my-market/protocol/openid-connect/certs
+      # OAuth2 Client Registration - Service-to-Service (Client Credentials Flow)
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_MARKET_APP_CLIENT_ID: market-app-client
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_MARKET_APP_CLIENT_SECRET: market-app-secret
       JAVA_OPTS: "-XX:TieredStopAtLevel=1"
     networks:
       - market-network
